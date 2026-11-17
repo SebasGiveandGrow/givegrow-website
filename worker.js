@@ -21206,7 +21206,11 @@ function portalMismoOrigen(request) {
   const sitio = request.headers.get("sec-fetch-site");
   return !sitio || sitio === "same-origin";
 }
-async function portalSesion(env, request) {
+/* `tipos`: quién puede usar el endpoint. Por omisión solo fundaciones: todo lo
+   que ya existía (perfil, documentos, unidades, indicadores…) es de ellas, y
+   una empresa con sesión recibe 401 ahí. El portal de empresa (17 nov 2026)
+   solo usa /api/portal/yo, /api/portal/empresa y salir. */
+async function portalSesion(env, request, tipos) {
   const t = portalCookie(request);
   if (!t) return null;
   const h = await sha256Hex(t);
@@ -21222,7 +21226,7 @@ async function portalSesion(env, request) {
     "AND s.email IS NOT NULL AND (lower(s.email) = lower(i.email) OR EXISTS " +
     "(SELECT 1 FROM portal_correos c WHERE c.inscripcion = s.inscripcion AND c.email = lower(s.email)))"
   ).bind(h).first();
-  if (!s || s.tipo !== "fundacion" || !PORTAL_ESTADOS.includes(s.estado)) return null;
+  if (!s || !(tipos || ["fundacion"]).includes(s.tipo) || !PORTAL_ESTADOS.includes(s.estado)) return null;
   await env.DB.prepare("UPDATE portal_sesiones SET ultimo_uso = datetime('now') WHERE hash = ?").bind(h).run();
   return s;
 }
@@ -21246,7 +21250,7 @@ async function portalMandarEnlace(env, i, para) {
   const enlace = ORIGIN + "/portal?t=" + t;
   const titulo = "Tu enlace para entrar al portal de Give&Grow";
   const parrafos = [
-    "Hola. Este es el enlace para entrar al portal de " + (i.nombre || "tu fundación") + " en el HUB SOCIAL de Give&Grow.",
+    "Hola. Este es el enlace para entrar al portal de " + (i.nombre || "tu organización") + " en el HUB SOCIAL de Give&Grow.",
     "Sirve una sola vez y vence en " + PORTAL_ENLACE_MIN + " minutos. Si vence, pide otro desde " + ORIGIN + "/portal con este mismo correo.",
     "Si no lo pediste tú, no tienes que hacer nada: sin este enlace nadie entra."
   ];
@@ -21276,7 +21280,7 @@ async function apiPortalEntrar(request, env) {
   }
   /* El correo de la solicitud o uno autorizado desde el panel (0053). */
   const i = await env.DB.prepare(
-    "SELECT id, nombre, email FROM inscripciones WHERE tipo = 'fundacion' " +
+    "SELECT id, nombre, email FROM inscripciones WHERE tipo IN ('fundacion', 'empresa') " +
     "AND estado IN ('aceptada','visitada','convenio','vinculada') " +
     "AND (lower(email) = ? OR id IN (SELECT inscripcion FROM portal_correos WHERE email = ?)) ORDER BY id DESC LIMIT 1"
   ).bind(email, email).first();
@@ -21310,7 +21314,7 @@ async function apiPortalSesion(request, env) {
     "SELECT id, tipo, estado FROM inscripciones i WHERE id = ? AND (lower(i.email) = lower(?) OR EXISTS " +
     "(SELECT 1 FROM portal_correos c WHERE c.inscripcion = i.id AND c.email = lower(?)))"
   ).bind(usado.inscripcion, usado.email || "", usado.email || "").first();
-  if (!i || i.tipo !== "fundacion" || !PORTAL_ESTADOS.includes(i.estado)) {
+  if (!i || !["fundacion", "empresa"].includes(i.tipo) || !PORTAL_ESTADOS.includes(i.estado)) {
     return json({ error: "sin_acceso", ayuda: "Esta solicitud ya no tiene acceso al portal. Escríbenos si crees que es un error." }, 403);
   }
   const sesion = tokenNuevo() + tokenNuevo();
@@ -21400,10 +21404,89 @@ async function apiPortalAporta(request, env) {
   return json({ ok: true, rol: d.rol, aporta: lista });
 }
 
+/* ============================================================================
+   EL PORTAL DE EMPRESA (punto 8, 17 nov 2026)
+   ============================================================================
+   Lo que una empresa aliada ve de su año con la red: sus jornadas de
+   voluntariado, las horas y las personas, los certificados emitidos y la
+   encuesta que le falta responder. Todo sale de tablas que ya existían
+   (jornadas, participaciones, reconocimientos, encuestas): esta pantalla no
+   pide ningún dato nuevo.
+
+   SOLO AGREGADOS. Las personas que fueron se inscribieron como voluntarios
+   con Give&Grow, no con su empresa: la empresa ve cuántas fueron y cuántas
+   horas, nunca nombres, correos ni edades. */
+const EMPRESA_ESTADO_ES = {
+  aceptada: "Aceptada: falta el Convenio Marco",
+  convenio: "En convenio",
+  vinculada: "Empresa aliada"
+};
+const JORNADA_ESTADO_ES = { planeada: "Planeada", confirmada: "Confirmada", realizada: "Realizada", cerrada: "Cerrada" };
+
+async function apiPortalEmpresa(request, env) {
+  const s = await portalSesion(env, request, ["empresa"]);
+  if (!s) return portalSinSesion();
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+  const hoy = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  let jornadas = [];
+  if (await existeTabla(env, "jornadas")) {
+    const certs = (await existeTabla(env, "reconocimientos"))
+      ? "(SELECT COUNT(*) FROM reconocimientos r JOIN participaciones p2 ON p2.id = r.participacion WHERE p2.jornada = j.id AND r.anulado_en IS NULL)"
+      : "0";
+    jornadas = (await env.DB.prepare(
+      "SELECT j.id, j.nombre, j.fecha, j.hora_inicio, j.lugar, j.anfitriona, j.estado, j.beneficiarios_directos, " +
+      "(SELECT COUNT(*) FROM participaciones p WHERE p.jornada = j.id) AS personas, " +
+      "(SELECT COALESCE(SUM(p.horas), 0) FROM participaciones p WHERE p.jornada = j.id AND p.horas IS NOT NULL) AS horas, " +
+      certs + " AS certificados, " +
+      "(SELECT e.token FROM encuestas e WHERE e.jornada = j.id AND e.actor = 'empresa' AND e.participacion IS NULL AND e.respondida_en IS NULL) AS encuesta " +
+      "FROM jornadas j WHERE j.empresa_inscripcion = ? AND j.estado <> 'cancelada' " +
+      "ORDER BY COALESCE(j.fecha, '9999-12-31') DESC, j.id DESC LIMIT 200"
+    ).bind(s.inscripcion).all()).results || [];
+  }
+  const red = await fundacionesRed(env);
+  const hechas = jornadas.filter((j) => j.estado === "realizada" || j.estado === "cerrada");
+  const proxima = jornadas.filter((j) => (j.estado === "planeada" || j.estado === "confirmada") && j.fecha && j.fecha >= hoy)
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : 1))[0] || null;
+  /* El enlace del convenio solo mientras está en convenio: es el mismo que le
+     llegó por correo, y fuera de ese estado la página no abre. */
+  let convenio = null;
+  if (s.estado === "convenio") {
+    try {
+      const t = await env.DB.prepare("SELECT token FROM convenio_enlaces WHERE inscripcion = ?").bind(s.inscripcion).first();
+      if (t && t.token) convenio = "/convenio/" + t.token;
+    } catch (e) { /* sin la 0038 */ }
+  }
+  const benef = hechas.filter((j) => j.beneficiarios_directos != null);
+  return json({
+    ok: true, estado: s.estado, estado_es: EMPRESA_ESTADO_ES[s.estado] || s.estado, convenio,
+    totales: {
+      horas: Math.round(hechas.reduce((t, j) => t + (Number(j.horas) || 0), 0) * 10) / 10,
+      personas: hechas.reduce((t, j) => t + (Number(j.personas) || 0), 0),
+      certificados: hechas.reduce((t, j) => t + (Number(j.certificados) || 0), 0),
+      realizadas: hechas.length, jornadas: jornadas.length,
+      anfitrionas: new Set(hechas.map((j) => j.anfitriona).filter(Boolean)).size,
+      beneficiarios: benef.length ? benef.reduce((t, j) => t + (Number(j.beneficiarios_directos) || 0), 0) : null
+    },
+    proxima: proxima ? { nombre: proxima.nombre, fecha: proxima.fecha, hora: proxima.hora_inicio, lugar: proxima.lugar,
+      anfitriona: nombreAnfitriona(red, proxima.anfitriona), personas: proxima.personas } : null,
+    jornadas: jornadas.map((j) => ({
+      nombre: j.nombre, fecha: j.fecha, anfitriona: nombreAnfitriona(red, j.anfitriona),
+      estado: j.estado, estado_es: JORNADA_ESTADO_ES[j.estado] || j.estado,
+      personas: j.personas, horas: Math.round((Number(j.horas) || 0) * 10) / 10, certificados: j.certificados,
+      beneficiarios: j.estado === "realizada" || j.estado === "cerrada" ? j.beneficiarios_directos : null,
+      encuesta: j.encuesta ? "/encuesta/" + j.encuesta : null
+    }))
+  });
+}
+
 /* GET /api/portal/yo — todo lo que pinta la pantalla. */
 async function apiPortalYo(request, env) {
-  const s = await portalSesion(env, request);
+  const s = await portalSesion(env, request, ["fundacion", "empresa"]);
   if (!s) return portalSinSesion();
+  if (s.tipo === "empresa") {
+    return json({ ok: true, tipo: "empresa", nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado,
+      estado_es: EMPRESA_ESTADO_ES[s.estado] || s.estado });
+  }
   const editable = s.ficha_estado === "enviada";
   const pf = editable ? await portalPerfil(env, s) : null;
   const docs = (await env.DB.prepare(
@@ -21593,7 +21676,7 @@ async function adminPortalAccion(request, env, insc, email) {
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
   if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
   const i = await env.DB.prepare("SELECT id, nombre, email, estado, tipo FROM inscripciones WHERE id = ?").bind(insc).first();
-  if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
+  if (!i || !(i.tipo === "fundacion" || (i.tipo === "empresa" && c.accion === "invitar"))) return json({ error: "no_encontrado" }, 404);
   let detalle;
   if (c.accion === "revisado") {
     await env.DB.prepare("UPDATE perfil_fundacion SET revisado_en = datetime('now'), revisado_por = ? WHERE inscripcion = ? AND revisado_en IS NULL").bind(email || null, insc).run();
@@ -23475,6 +23558,26 @@ function paginaPortal(nonce) {
     .tipo{min-height:64px}
   }
 
+  /* EL PORTAL DE EMPRESA: la misma franja, sin pestañas ni recorrido. La
+     cifra de horas va en un bloque verde, que es lo que una empresa lleva a su
+     informe de sostenibilidad. */
+  body[data-empresa] .tabs,body[data-empresa] #p-paso,body[data-empresa] #p-recorrido,
+  body[data-empresa] [role=tabpanel]{display:none!important}
+  .emp-cifras{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
+  .emp-cifras .tarjeta + .tarjeta{margin-top:0}
+  .emp-cifras .fuerte{background:#16402A;border-color:#16402A;color:#fff}
+  .emp-cifras .fuerte .ey{color:#C9DACD}
+  .emp-cifras .fuerte .sub{color:#E4F0E7}
+  .emp-cifras .fuerte .cifra{font-size:52px;line-height:1}
+  .tabla-emp{width:100%;border-collapse:collapse;font-size:14.5px}
+  .tabla-emp th{text-align:left;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--mu);padding:0 10px 8px 0}
+  .tabla-emp td{padding:12px 10px 12px 0;border-top:1px solid var(--bds);vertical-align:top}
+  /* «cifra-t» y no «num»: el portal ya tiene un .num (inline-block) que
+     sacaba estas celdas de la tabla. */
+  .tabla-emp .cifra-t{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .tabla-emp-caja{overflow-x:auto}
+  @media (max-width:860px){ .emp-cifras{grid-template-columns:repeat(2,minmax(0,1fr))} .emp-cifras .fuerte{grid-column:1 / -1} }
+
   /* Adriatic Blue (Pantone 17-4320, #5C899B) con lirios blancos: Positive
      Potential. El azul de la franja solo lleva texto grande (3,8:1 con el
      blanco); la barra y los botones usan su versión profunda, #2B5666. */
@@ -23501,7 +23604,7 @@ function paginaPortal(nonce) {
 <header class="barra-marca">
   <div class="in">
     <img src="/favicon.svg" alt="" width="30" height="30">
-    <div class="t">Give&amp;Grow<small>Portal de fundaciones · HUB SOCIAL</small></div>
+    <div class="t">Give&amp;Grow<small id="p-marca">Portal de fundaciones · HUB SOCIAL</small></div>
     <div class="der oculto" id="p-sesion">
       <span id="p-correo"></span>
       <button type="button" class="btn claro mini" id="b-salir">Cerrar sesión</button>
@@ -23511,11 +23614,11 @@ function paginaPortal(nonce) {
 
 <main class="wrap">
   <section id="v-entrar" class="oculto angosto">
-    <p class="ey">Portal de fundaciones</p>
-    <h1 class="mt">Entra a tu fundación</h1>
-    <p class="saludo">Para las fundaciones con solicitud aceptada en el HUB SOCIAL.</p>
+    <p class="ey">Portal del HUB SOCIAL</p>
+    <h1 class="mt">Entra a tu portal</h1>
+    <p class="saludo">Para las fundaciones y empresas con solicitud aceptada en el HUB SOCIAL.</p>
     <form id="f-entrar" class="tarjeta mt" autocomplete="on">
-      <label for="e-correo">Correo de tu fundación</label>
+      <label for="e-correo">Correo de tu fundación o empresa</label>
       <span class="ayuda">El de la solicitud, o uno que el equipo de Give&amp;Grow haya autorizado.</span>
       <input type="email" id="e-correo" autocomplete="email" maxlength="160" required>
       <input type="text" id="e-web2" tabindex="-1" autocomplete="off" aria-hidden="true" class="oculto">
@@ -23562,6 +23665,7 @@ function paginaPortal(nonce) {
       <button type="button" class="tab" role="tab" id="t-indicadores" aria-controls="s-indicadores" aria-selected="false">Indicadores<span class="pill ambar oculto" id="tp-ind"></span></button>
     </div>
 
+    <div id="p-empresa" class="oculto"></div>
     <div id="s-resumen" role="tabpanel" aria-labelledby="t-resumen"></div>
     <div id="s-perfil" role="tabpanel" aria-labelledby="t-perfil" class="oculto"></div>
     <div id="s-apadrinamiento" role="tabpanel" aria-labelledby="t-apadrinamiento" class="oculto">
@@ -23827,6 +23931,7 @@ function pasoActual(){
   return 5;
 }
 function pintar(){
+  if (D.tipo === "empresa") { pintarEmpresa(); return; }
   $("p-nombre").textContent = D.nombre || "";
   $("p-correo").textContent = D.email || "";
   $("p-estado").textContent = D.estado_es || "";
@@ -23893,6 +23998,75 @@ function pintarResumen(){
   $("tp-docs").className = "pill" + (n === RECOMENDADOS.length ? " ok" : "");
   $("tp-perfil").textContent = "por revisar";
   $("tp-perfil").className = "pill ambar" + (D.perfil && D.perfil.por_revisar ? "" : " oculto");
+}
+
+/* EL PORTAL DE EMPRESA. Una sola pantalla: lo que sigue en la franja, las
+   cifras del año y la tabla de jornadas. Solo agregados. */
+var EMP = null;
+function fechaLarga(f){
+  if (!f) return "Sin fecha";
+  var m = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"], p = String(f).split("-");
+  return Number(p[2]) + " " + m[Number(p[1]) - 1] + " " + p[0];
+}
+function num(n){ return (Number(n) || 0).toLocaleString("es-CO"); }
+function pintarEmpresa(){
+  document.body.setAttribute("data-franja", "si");
+  document.body.setAttribute("data-empresa", "si");
+  $("p-marca").textContent = "Portal de empresas · HUB SOCIAL";
+  $("p-nombre").textContent = D.nombre || "";
+  $("p-correo").textContent = D.email || "";
+  $("p-estado").textContent = D.estado_es || "";
+  $("p-saludo").textContent = "Cada hora y cada aporte de su equipo, con su evidencia.";
+  $("p-empresa").classList.remove("oculto");
+  if (!EMP) {
+    $("p-empresa").innerHTML = '<p class="sub mt">Cargando…</p>';
+    fetch("/api/portal/empresa", { credentials: "same-origin" }).then(function(r){
+      if (r.status === 401) { ver("v-entrar"); return null; }
+      return r.ok ? r.json() : null;
+    }).then(function(d){ if (d) { EMP = d; pintarEmpresa(); } })
+      .catch(function(){ $("p-empresa").innerHTML = '<p class="sub mt">No pudimos cargar su información. Intenten de nuevo.</p>'; });
+    return;
+  }
+  var E = EMP, T = E.totales, P = E.proxima;
+  /* Lo que sigue: el convenio si falta; si no, la próxima jornada; si no hay,
+     proponer una. */
+  var sg = E.estado === "aceptada"
+      ? { t: "El Convenio Marco", p: "Les enviamos el Convenio Marco para revisarlo y firmarlo en línea. Si no les ha llegado, escríbannos." }
+    : E.convenio
+      ? { t: "Firmar el Convenio Marco", p: "Revisen el convenio, completen el Anexo 1 y fírmenlo en línea.", url: E.convenio, b: "Ir al convenio" }
+    : E.estado === "convenio"
+      ? { t: "El Convenio Marco", p: "Estamos preparando su Convenio Marco. Les llega por correo para revisarlo y firmarlo en línea." }
+    : P ? { t: "Jornada del " + fechaLarga(P.fecha), p: P.nombre + (P.anfitriona ? ", con " + P.anfitriona : "") + (P.lugar ? " · " + P.lugar : "") + (P.hora ? " · " + P.hora : "") +
+          ". " + (P.personas ? P.personas + (P.personas === 1 ? " persona inscrita." : " personas inscritas.") : "Todavía sin personas inscritas.") }
+    : { t: "Proponer una jornada", p: "Cuéntennos qué quieren hacer con su equipo y la armamos con una fundación del HUB.",
+        url: "mailto:contacto@thegiveandgrowproject.org?subject=" + encodeURIComponent("Proponer una jornada · " + (D.nombre || "")), b: "Escribirnos" };
+  var caja = $("p-da");
+  caja.classList.remove("oculto"); caja.classList.add("sigue");
+  caja.innerHTML = '<div><p class="ey">Lo que sigue</p><h2>' + esc(sg.t) + '</h2><p class="sub">' + esc(sg.p) + "</p></div>" +
+    (sg.url ? '<a class="btn" href="' + esc(sg.url) + '">' + esc(sg.b) + "</a>" : "");
+  var h = '<div class="emp-cifras">' +
+    '<div class="tarjeta fuerte"><p class="ey">Horas de voluntariado</p><p class="cifra">' + num(T.horas) + '</p><p class="sub">horas efectivas de su equipo, registradas por jornada.</p></div>' +
+    '<div class="tarjeta"><p class="ey">Personas</p><p class="cifra">' + num(T.personas) + '</p><p class="sub">participaciones; ' + num(T.certificados) + (T.certificados === 1 ? " certificado emitido." : " certificados emitidos.") + "</p></div>" +
+    '<div class="tarjeta"><p class="ey">Jornadas</p><p class="cifra">' + T.realizadas + " de " + T.jornadas + '</p><p class="sub">realizadas.</p></div>' +
+    '<div class="tarjeta"><p class="ey">Fundaciones</p><p class="cifra">' + T.anfitrionas + '</p><p class="sub">' + (T.anfitrionas === 1 ? "anfitriona" : "anfitrionas") + " de sus jornadas.</p></div>" +
+  "</div>";
+  if (T.beneficiarios != null) h += '<p class="sub mt">Las fundaciones anfitrionas reportan ' + num(T.beneficiarios) + " personas beneficiadas directamente en esas jornadas. Es la cifra que reporta cada fundación, no una medición de Give&amp;Grow.</p>";
+  var J = E.jornadas || [];
+  h += '<div class="tarjeta mt"><h2>Jornadas</h2>' + (J.length
+    ? '<div class="tabla-emp-caja mt"><table class="tabla-emp"><thead><tr><th scope="col">Fecha</th><th scope="col">Jornada</th><th scope="col">Anfitriona</th>' +
+      '<th scope="col">Personas</th><th scope="col">Horas</th><th scope="col">Estado</th></tr></thead><tbody>' +
+      J.map(function(j){
+        var hecha = j.estado === "realizada" || j.estado === "cerrada";
+        return "<tr><td><strong>" + esc(fechaLarga(j.fecha)) + "</strong></td><td>" + esc(j.nombre) +
+          (j.encuesta ? '<br><a href="' + esc(j.encuesta) + '">Responder la encuesta de esta jornada</a>' : "") + "</td>" +
+          "<td>" + esc(j.anfitriona || "Por definir") + '</td><td class="cifra-t">' + num(j.personas) + (hecha ? "" : (j.personas === 1 ? " inscrita" : " inscritas")) + '</td>' +
+          '<td class="cifra-t">' + (hecha ? num(j.horas) : "—") + "</td>" +
+          '<td><span class="pill' + (hecha ? " ok" : "") + '">' + esc(j.estado_es) + "</span>" +
+          (hecha && j.certificados ? '<br><small class="sub">' + j.certificados + (j.certificados === 1 ? " certificado" : " certificados") + "</small>" : "") + "</td></tr>";
+      }).join("") + "</tbody></table></div>"
+    : '<p class="sub mt">Todavía no hay jornadas de su empresa. Cuando armemos la primera, aparece aquí con sus horas y sus certificados.</p>') + "</div>";
+  h += '<p class="sub mt">Por privacidad, aquí no aparecen los nombres de las personas que fueron: cada una se inscribió como voluntaria con Give&amp;Grow y recibe su certificado directamente. ¿Dudas? <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>.</p>';
+  $("p-empresa").innerHTML = h;
 }
 
 /* QUÉ PUEDEN DAR: los siete tipos, cada uno con su unidad. Se guarda al tocar.
@@ -24469,6 +24643,8 @@ function subir(f, tipo, nota, idMsg){
 }
 
 function irA(tab){
+  /* La empresa no tiene pestañas: pedir las de una fundación le daría 401. */
+  if (D && D.tipo === "empresa") return;
   TAB = tab;
   if (tab === "apadrinamiento" && UNIDADES === null) cargarUnidades();
   if (tab === "indicadores" && INDS === null) cargarIndicadores();
@@ -39172,6 +39348,9 @@ function cargarInscripciones(){
           /* El portal (0052): desde «aceptada» la fundación puede entrar. */
           ((esFund && (i.estado === "aceptada" || i.estado === "visitada" || i.estado === "convenio" || i.estado === "vinculada"))
             ? '<br><small><button class="copy" data-portal="' + i.id + '">Portal…</button></small>' : "") +
+          /* El portal de empresa (17 nov 2026): desde «aceptada» también. */
+          ((esEmp && x.formato !== "evento" && (i.estado === "aceptada" || i.estado === "convenio" || i.estado === "vinculada"))
+            ? '<br><small><button class="copy" data-portal-invitar="' + i.id + '">Enviar enlace del portal</button></small>' : "") +
           (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '" data-de="' + esc(i.estado) + '" data-nombre="' + esc(i.nombre || "") + '">' + cerrar[1] + '</button></small>' : "") +
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
              borren sus datos no tiene por que haber llegado a «aceptada». */
@@ -50936,6 +51115,7 @@ export default {
         if (ruta === "/api/portal/aporta")  return await apiPortalAporta(request, env);
         if (ruta === "/api/portal/red")     return await apiPortalRed(request, env);
         if (ruta === "/api/portal/aportes") return await apiPortalAportes(request, env);
+        if (ruta === "/api/portal/empresa") return await apiPortalEmpresa(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
