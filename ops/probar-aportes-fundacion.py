@@ -157,6 +157,36 @@ linea(st == 200, "uno por confirmar sí")
 st, _, _ = pedir("/api/portal/aportes", {"accion": "retirar", "id": dos}, recibe)
 linea(st in (403, 404), "y nadie retira el aporte de otra fundación (http %s)" % st)
 
+print("\n== 6. el portal de empresa ==")
+sql("DELETE FROM jornadas WHERE id IN (9101, 9102, 9103); DELETE FROM participaciones WHERE jornada IN (9101, 9102, 9103); "
+    "DELETE FROM inscripciones WHERE id = 904;")
+sql("INSERT INTO inscripciones (id, tipo, estado, nombre, email) VALUES (904, 'empresa', 'vinculada', 'Empresa', 'f904@example.com')")
+sql("INSERT INTO jornadas (id, nombre, fecha, anfitriona, empresa_inscripcion, puerta, estado, beneficiarios_directos) VALUES "
+    "(9101, 'Hecha', '2026-06-14', 'sede', 904, 'impact-journey', 'cerrada', 40), "
+    "(9102, 'Próxima', '2099-01-24', 'sede', 904, 'impact-journey', 'confirmada', NULL), "
+    "(9103, 'Cancelada', '2026-07-01', 'sede', 904, 'impact-journey', 'cancelada', NULL)")
+sql("INSERT INTO participaciones (jornada, nombre, email, horas) VALUES (9101, 'Ana', 'ana@example.com', 4), (9101, 'Beto', 'beto@example.com', 3.5), (9102, 'Caro', 'caro@example.com', NULL)")
+empresa = entrar(904, "e" * 32)
+_, yo, _ = pedir("/api/portal/yo", None, empresa)
+linea(yo.get("tipo") == "empresa" and "perfil" not in yo, "la empresa entra y /yo no le trae nada de una fundación")
+st, d, _ = pedir("/api/portal/empresa", None, empresa)
+t = d.get("totales", {})
+linea(st == 200 and t.get("horas") == 7.5 and t.get("personas") == 2 and t.get("realizadas") == 1 and t.get("jornadas") == 2,
+      "suma solo lo realizado y deja fuera la cancelada (%s)" % t)
+linea((d.get("proxima") or {}).get("nombre") == "Próxima", "la próxima jornada sale en «Lo que sigue»")
+crudo = json.dumps(d, ensure_ascii=False)
+linea("Ana" not in crudo and "ana@example.com" not in crudo and "Beto" not in crudo,
+      "ningún nombre ni correo de quien fue")
+malos = [r for r in ["/api/portal/intercambios", "/api/portal/aportes", "/api/portal/red", "/api/portal/recibido"]
+         if pedir(r, None, empresa)[0] != 401]
+linea(not malos, "los endpoints de fundación le responden 401 (%s)" % (malos or "todos"))
+st, _, _ = pedir("/api/portal/empresa", None, da)
+linea(st == 401, "y una fundación no ve el de empresa (http %s)" % st)
+st, d, _ = pedir("/api/admin/portal/904", {"accion": "invitar"})
+linea(st == 200 and d.get("para") == "f904@example.com", "el panel le manda el enlace a la empresa (http %s)" % st)
+st, _, _ = pedir("/api/admin/portal/904", {"accion": "revisado"})
+linea(st == 404, "«marcar revisado» sigue siendo solo de fundaciones (http %s)" % st)
+
 print("\n== resumen ==")
 print("%d ok · %d fallos" % (okc, failc))
 sys.exit(1 if failc else 0)
