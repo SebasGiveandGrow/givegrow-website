@@ -23412,26 +23412,32 @@ function paginaPortal(nonce) {
   /* LA FUNDACIÓN QUE APORTA (16 nov 2026). Su cabecera es una franja a todo el
      ancho con una foto de terreno debajo y, encima, un panel de vidrio con lo
      que puede dar. Vidrio sobre foto, papel sobre papel: el resto del portal
-     sigue en tarjetas. Solo con body[data-da] y sin tema propio: un portal
+     sigue en tarjetas. La llevan TODAS las fundaciones (data-franja), la que
+     aporta con su selector y la que solo recibe con «Lo que sigue». Sin tema propio: un portal
      vestido para una fundación conserva su cabecera.
      La foto es la misma de la portada del sitio (Alta Guajira, con
      consentimiento registrado). El velo la deja en 0,62–0,42 de verde oscuro:
      el texto blanco queda por encima de 7:1 en toda la franja. */
-  body[data-da]:not([data-tema]){overflow-x:clip}
-  body[data-da]:not([data-tema]) .cab-f{position:relative;margin:-28px calc(50% - 50vw) 0;padding:34px calc(50vw - 50%) 26px;
+  body[data-franja]:not([data-tema]){overflow-x:clip}
+  body[data-franja]:not([data-tema]) .cab-f{position:relative;margin:-28px calc(50% - 50vw) 0;padding:34px calc(50vw - 50%) 26px;
     background:#16402A url(/img/jornadas/hero_futbol_1400.webp) center 42%/cover no-repeat}
-  body[data-da]:not([data-tema]) .cab-f::before{content:"";position:absolute;inset:0;
+  body[data-franja]:not([data-tema]) .cab-f::before{content:"";position:absolute;inset:0;
     background:linear-gradient(180deg,rgba(14,33,24,.68) 0%,rgba(14,33,24,.46) 100%)}
-  body[data-da]:not([data-tema]) .cab-f > *{position:relative}
-  body[data-da]:not([data-tema]) .cab-f .ey{color:#E4F0E7}
-  body[data-da]:not([data-tema]) .cab-f h1{color:#fff;font-size:30px}
-  body[data-da]:not([data-tema]) .cab-f .saludo{color:#fff}
+  body[data-franja]:not([data-tema]) .cab-f > *{position:relative}
+  body[data-franja]:not([data-tema]) .cab-f .ey{color:#E4F0E7}
+  body[data-franja]:not([data-tema]) .cab-f h1{color:#fff;font-size:30px}
+  body[data-franja]:not([data-tema]) .cab-f .saludo{color:#fff}
   .vidrio{margin-top:18px;padding:18px 20px;border-radius:14px;color:#fff;background:rgba(14,33,24,.52);
     -webkit-backdrop-filter:blur(18px) saturate(1.25);backdrop-filter:blur(18px) saturate(1.25);
     border:1px solid rgba(255,255,255,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
   /* Con tema propio no hay foto debajo: el panel va en papel, como una tarjeta. */
   body[data-tema] .vidrio{position:relative;z-index:1;background:var(--surface);color:var(--ink);border-color:var(--bd);box-shadow:none;
-    -webkit-backdrop-filter:none;backdrop-filter:none}
+    -webkit-backdrop-filter:none;backdrop-filter:none;max-width:calc(100% - 440px)}
+  body[data-tema] .tipos{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media (max-width:720px){
+    body[data-tema] .vidrio{max-width:none}
+    body[data-tema] .tipos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
   .vidrio h2{font-size:17px}
   .vidrio .cab{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
   .vidrio .cab h2{flex:1 1 auto}
@@ -23452,11 +23458,19 @@ function paginaPortal(nonce) {
   body[data-tema] .tipo[aria-pressed=true] span{color:var(--ink-soft)}
   body[data-tema] .tipo:focus-visible{outline-color:var(--acc)}
   .vidrio .msg{display:block;min-height:20px;margin-top:8px;font-size:13.5px;color:#fff}
+  /* «Lo que sigue» dentro del vidrio: texto a la izquierda, botón a la derecha. */
+  .vidrio.sigue{display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap}
+  .vidrio.sigue > div{flex:1 1 320px}
+  .vidrio.sigue .ey{color:#C9DACD}
+  .vidrio.sigue .sub{color:#E4F0E7;margin-top:4px}
+  body:not([data-tema]) .vidrio.sigue .btn{background:#FBF8F1;border-color:#FBF8F1;color:#16402A}
+  body[data-tema] .vidrio.sigue .ey{color:var(--mu)}
+  body[data-tema] .vidrio.sigue .sub{color:var(--mu)}
   body[data-tema] .vidrio .msg{color:var(--ink)}
   @media (max-width:1000px){ .tipos{grid-template-columns:repeat(4,minmax(0,1fr))} }
   @media (max-width:720px){
-    body[data-da]:not([data-tema]) .cab-f{padding-top:26px;padding-bottom:20px}
-    body[data-da]:not([data-tema]) .cab-f h1{font-size:24px}
+    body[data-franja]:not([data-tema]) .cab-f{padding-top:26px;padding-bottom:20px}
+    body[data-franja]:not([data-tema]) .cab-f h1{font-size:24px}
     .tipos{grid-template-columns:repeat(2,minmax(0,1fr))}
     .tipo{min-height:64px}
   }
@@ -23858,10 +23872,13 @@ function pintarResumen(){
   var s = siguiente(), n = cuantosRecomendados();
   var perfilTxt = !D.perfil ? "Se abre cuando envíes el cuestionario." : D.perfil.por_revisar ? "Tus últimos cambios están por revisar." : "Al día con lo que tenemos.";
   var porRevisar = (D.documentos || []).filter(function(d){ return !d.revisado; }).length;
+  /* «Lo que sigue» va en la cabecera para quien solo recibe (pintarDa). Aquí
+     se queda para quien tiene el selector de aportes ocupando ese lugar. */
+  var arriba = !(D.rol === "aporta" || D.rol === "ambas" || DA_ABIERTO || D.tema);
   $("s-resumen").innerHTML =
-    '<div class="tarjeta aviso"><p class="ey">Lo que sigue</p><h2 class="mt">' + esc(s.t) + '</h2><p class="sub">' + esc(s.p) + "</p>" +
-      '<div class="acciones">' + (s.url ? '<a class="btn" href="' + esc(s.url) + '">' + esc(s.b) + "</a>" : '<button type="button" class="btn" data-ir="' + s.tab + '">' + esc(s.b) + "</button>") + "</div></div>" +
-    '<div class="rejilla mt">' +
+    (arriba ? "" : '<div class="tarjeta aviso"><p class="ey">Lo que sigue</p><h2 class="mt">' + esc(s.t) + '</h2><p class="sub">' + esc(s.p) + "</p>" +
+      '<div class="acciones">' + (s.url ? '<a class="btn" href="' + esc(s.url) + '">' + esc(s.b) + "</a>" : '<button type="button" class="btn" data-ir="' + s.tab + '">' + esc(s.b) + "</button>") + "</div></div>") +
+    '<div class="rejilla' + (arriba ? "" : " mt") + '">' +
       '<div class="tarjeta"><p class="ey">Perfil</p><p class="cifra">' + (!D.perfil ? "—" : D.perfil.por_revisar ? "Por revisar" : "Al día") + '</p><p class="sub">' + esc(perfilTxt) + "</p>" +
         (D.perfil ? '<div class="acciones"><button type="button" class="btn sec mini" data-ir="perfil">Editar</button></div>' : "") + "</div>" +
       '<div class="tarjeta"><p class="ey">Documentos</p><p class="cifra">' + n + " de " + RECOMENDADOS.length + '</p><p class="sub">de los que conviene tener' + (porRevisar ? " · " + porRevisar + " por revisar" : "") + '.</p><div class="acciones"><button type="button" class="btn sec mini" data-ir="documentos">Subir</button></div></div>' +
@@ -23890,7 +23907,7 @@ function pintarRol(){
   $("p-saludo").textContent = D.saludo || (D.rol === "aporta" ? "Lo que su fundación aporta a la red del HUB."
     : D.rol === "ambas" ? "Lo que su fundación recibe de la red del HUB, y lo que le aporta."
     : "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.");
-  if (da || DA_ABIERTO) document.body.setAttribute("data-da", "si"); else document.body.removeAttribute("data-da");
+  document.body.setAttribute("data-franja", "si");
   /* Quien solo aporta no tiene unidades que apadrinar: esa pestaña se le quita.
      «Dar y recibir» pasa a llamarse por lo que hace en ella. */
   $("t-apadrinamiento").classList.toggle("oculto", D.rol === "aporta");
@@ -23900,8 +23917,20 @@ function pintarRol(){
 function pintarDa(){
   var caja = $("p-da");
   var da = D.rol === "aporta" || D.rol === "ambas";
-  caja.classList.toggle("oculto", !(da || DA_ABIERTO));
-  if (!(da || DA_ABIERTO)) { caja.innerHTML = ""; return; }
+  /* Un portal con tema propio no recibe «Lo que sigue» en la cabecera: ahí va
+     su dibujo, y un panel a todo el ancho lo taparía. Lo conserva en el resumen. */
+  var conTema = !!D.tema;
+  caja.classList.toggle("oculto", !(da || DA_ABIERTO) && conTema);
+  caja.classList.toggle("sigue", !(da || DA_ABIERTO));
+  if (!(da || DA_ABIERTO) && conTema) { caja.innerHTML = ""; return; }
+  if (!(da || DA_ABIERTO)) {
+    /* Quien solo recibe ve aquí lo que sigue en su alianza. Es la misma
+       tarjeta que antes abría el resumen, subida a la cabecera. */
+    var sg = siguiente();
+    caja.innerHTML = '<div><p class="ey">Lo que sigue</p><h2>' + esc(sg.t) + '</h2><p class="sub">' + esc(sg.p) + "</p></div>" +
+      (sg.url ? '<a class="btn" href="' + esc(sg.url) + '">' + esc(sg.b) + "</a>" : '<button type="button" class="btn" data-ir="' + sg.tab + '">' + esc(sg.b) + "</button>");
+    return;
+  }
   var mio = {}; (D.aporta || []).forEach(function(k){ mio[k] = true; });
   caja.innerHTML = '<div class="cab"><h2>Qué pueden dar</h2><span>Marquen todo lo que aplica. Cada tipo se mide en su propia unidad.</span></div>' +
     '<div class="tipos">' + (D.aportes || []).map(function(a){
@@ -23924,11 +23953,7 @@ function tocarAporta(id){
     }
     D.rol = r.d.rol; D.aporta = r.d.aporta;
     DA_ABIERTO = DA_ABIERTO && D.rol === "recibe";
-    pintarRol(); pintarOfrecen(); APF = null; pintarAportes();
-    if ($("p-recibido")) {
-      $("p-recibido").classList.toggle("oculto", D.rol === "aporta");
-      if (D.rol !== "aporta") pintarRecibido();
-    }
+    APF = null; pintarRol(); pintarResumen();
     if ($("m-da")) $("m-da").textContent = "Guardado.";
   }).catch(function(){ pintarDa(); if ($("m-da")) $("m-da").textContent = "No pudimos conectar. Intenta de nuevo."; });
 }
@@ -24502,7 +24527,7 @@ document.addEventListener("click", function(ev){
   if (ev.target.id === "apf-tipo") unidadesApf();
   var ra = ev.target.closest && ev.target.closest("[data-apf-retirar]");
   if (ra) retirarApf(ra.getAttribute("data-apf-retirar"));
-  if (ev.target.id === "b-da-abrir") { DA_ABIERTO = true; pintarRol(); pintarOfrecen(); window.scrollTo(0, 0); }
+  if (ev.target.id === "b-da-abrir") { DA_ABIERTO = true; pintarRol(); pintarResumen(); window.scrollTo(0, 0); }
 });
 document.addEventListener("change", function(ev){
   var el = ev.target;
