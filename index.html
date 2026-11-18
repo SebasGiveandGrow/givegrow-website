@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=fd9b2243">
+<link rel="stylesheet" href="/styles.css?v=ddd7f59b">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -2671,14 +2671,14 @@
   </section>
 </main>
 
-<main id="page-transparencia" class="page inf">
+<main id="page-transparencia" class="page">
   <!-- TRANSPARENCIA COMO INFORME (17 nov 2026, rediseño v5: reglas finas y una
        cifra). Se lee como un informe anual: el nombre de cada sección a la
        izquierda, sus filas a la derecha, una regla fuerte al abrir y una fina
        entre filas. Sin tarjetas. El elemento firma es el NIT en grande: es lo
        más verificable que tiene la fundación, y no hay cifra financiera
        validada que poner en su lugar. -->
-  <div class="wrap">
+  <div class="wrap inf-wrap">
     <!-- Cabecera y pie de hoja: no existen en pantalla, solo al imprimir. -->
     <div class="transp-cab solo-impresion" aria-hidden="true">
       <span>Fundación Give&amp;Grow International</span>
@@ -3239,56 +3239,86 @@
 
 <!-- FOOTER -->
 <main id="page-membresias" class="page">
-  <section>
-    <div class="wrap">
-      <span class="ey rv" data-i18n="membres.ey">Membresías</span>
-      <h1 class="h-sec rv" data-i18n="membres.t">Crece con cada aporte.</h1>
-      <p class="lead rv d1" data-i18n="membres.lead">Hacerte miembro es donar de forma recurrente y crecer con la fundación. Cada nivel suma beneficios a los del anterior, con montos sugeridos y la opción de dar otro valor.</p>
-    </div>
-  </section>
-  <section class="cream">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="membres.tiers.ey">Tu recorrido</span>
-      <h2 class="h-sec rv" data-i18n="membres.tiers.t">De semilla a bosque.</h2>
+  <!-- MEMBRESÍAS COMO INFORME (17 nov 2026, rediseño v5, el mismo modelo que
+       /transparencia): el nombre de cada sección a la izquierda, sus filas a la
+       derecha, regla fuerte al abrir y fina entre filas. Los niveles son filas
+       de un libro, no cuatro tarjetas: nivel y monto, lo que recibes, y lo que
+       está en preparación con su marca ámbar. La hoja «Hazte miembro» y la
+       membresía en dólares, más abajo, no cambian: son formularios de pago.
+       El botón de la cabecera baja con irASeccion y no con href="#…": el sitio
+       es una SPA de hash y el enrutador leería el ancla como una ruta (404). -->
+    <div class="wrap inf-wrap">
+      <div class="inf-cab">
+        <div class="inf-lado"><span class="ey" data-i18n="membres.ey">Membresías</span></div>
+        <div class="inf-cuerpo">
+          <h1 class="inf-h1" data-i18n="membres.t">Crece con cada aporte.</h1>
+          <p class="inf-lead" data-i18n="membres.lead">Hacerte miembro es donar de forma recurrente y crecer con la fundación. Cada nivel suma beneficios a los del anterior, con montos sugeridos y la opción de dar otro valor.</p>
+          <p class="inf-mas"><a class="btn btn-g" href="/membresias" data-act="irASeccion('hazte-miembro')" data-i18n="membres.cta.t">Hazte miembro.</a></p>
+        </div>
+      </div>
+
       <!-- LO QUE EXISTE HOY va en la lista de cada nivel; lo que todavía no tiene
-           cómo entregarse va junto, en UNA línea «En preparación» al pie del
-           nivel (boletín, reconocimiento publicado, certificados personalizados,
-           eventos, reportes periódicos, reunión). Hasta el 8 oct 2026 era una
-           marca por beneficio —once en la página—, y justo donde se decide pagar
-           se leía como un borrador. Árbol y Bosque hoy no suman nada que ya
-           exista: por eso su «Todo lo de…» termina en punto, sin lista. Decisión
-           de Sebas, 29 sep y 8 oct 2026. Cuando uno exista, sube a la lista. -->
-      <div class="grid g4 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg></div><h3 data-i18n="membres.t1.t">Semilla</h3><div class="tier-price"><b data-i18n="membres.t1.price">$20.000</b><span data-i18n="membres.t1.priceu">/ mes · o US$5 por PayPal</span></div><p data-i18n="membres.t1.p">El primer paso: empiezas a sembrar impacto cada mes.</p><ul class="tier-ben"><li data-i18n="membres.t1.b0">Recibo y número de guía con cada aporte, y carnet digital</li><li data-i18n="membres.t1.b2">Certificado de donación si lo pides (Art. 257 ET, solo Colombia)</li></ul><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t1.soon">Boletín de impacto con historias reales y reconocimiento en web y redes.</span></p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg></div><h3 data-i18n="membres.t2.t">Retoño</h3><div class="tier-price"><b data-i18n="membres.t2.price">$50.000</b><span data-i18n="membres.t2.priceu">/ mes · o US$15 por PayPal</span></div><p data-i18n="membres.t2.p">Tu aporte crece y sostiene programas con más alcance.</p><p class="tier-more" data-i18n="membres.t2.more">Todo lo de Semilla, y además:</p><ul class="tier-ben"><li data-i18n="membres.t2.b1">Acceso al Programa de Gratitud</li></ul><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t2.soon">Certificado de agradecimiento personalizado y contenido especial de voluntariado e impacto.</span></p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><circle cx="12" cy="9.5" r="6"/></svg></div><h3 data-i18n="membres.t3.t">Árbol</h3><div class="tier-price"><b data-i18n="membres.t3.price">$120.000</b><span data-i18n="membres.t3.priceu">/ mes · o US$35 por PayPal</span></div><p data-i18n="membres.t3.p">Un compromiso firme. Con aportes de este tamaño la red puede planear el trabajo con las fundaciones, no solo responder a la urgencia.</p><p class="tier-more" data-i18n="membres.t3.more">Todo lo de Retoño.</p><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t3.soon">Invitación a eventos y sesiones en vivo, acceso prioritario a Impact Journey y certificado de impacto personalizado.</span></p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg></div><h3 data-i18n="membres.t4.t">Bosque</h3><div class="tier-price"><b data-i18n="membres.t4.price">$250.000+</b><span data-i18n="membres.t4.priceu">/ mes · o US$75+ por PayPal</span></div><p data-i18n="membres.t4.p">El nivel más alto: sostienes la red completa, la base estable sobre la que crecen las demás formas de aportar.</p><p class="tier-more" data-i18n="membres.t4.more">Todo lo de Árbol.</p><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t4.soon">Reportes de impacto detallados y reunión con el fundador.</span></p></div>
-      </div>
+           cómo entregarse va junto, en UNA línea «En preparación» (decisión de
+           Sebas, 29 sep y 8 oct 2026). Árbol y Bosque hoy no suman nada que ya
+           exista: por eso su «Todo lo de…» termina en punto, sin lista. Cuando
+           uno exista, sube a la lista. -->
+      <section class="inf-sec" aria-labelledby="mb-niv-t">
+        <div class="inf-lado">
+          <span class="ey" data-i18n="membres.tiers.ey">Tu recorrido</span>
+          <h2 id="mb-niv-t" class="inf-h2" data-i18n="membres.tiers.t">De semilla a bosque.</h2>
+        </div>
+        <div class="inf-cuerpo inf-niveles">
+        <div class="inf-nivel">
+          <div class="inf-nivel-nom"><h3 class="inf-h3" data-i18n="membres.t1.t">Semilla</h3><p class="inf-precio"><b data-i18n="membres.t1.price">$20.000</b><span data-i18n="membres.t1.priceu">/ mes · o US$5 por PayPal</span></p></div>
+          <div class="inf-nivel-que"><p data-i18n="membres.t1.p">El primer paso: empiezas a sembrar impacto cada mes.</p><ul class="inf-lista"><li data-i18n="membres.t1.b0">Recibo y número de guía con cada aporte, y carnet digital</li><li data-i18n="membres.t1.b2">Certificado de donación si lo pides (Art. 257 ET, solo Colombia)</li></ul></div>
+          <div class="inf-nivel-prep"><span class="inf-pend" data-i18n="membres.prep">En preparación</span> <span class="inf-pend-p" data-i18n="membres.t1.soon">Boletín de impacto con historias reales y reconocimiento en web y redes.</span></div>
+        </div>
+        <div class="inf-nivel">
+          <div class="inf-nivel-nom"><h3 class="inf-h3" data-i18n="membres.t2.t">Retoño</h3><p class="inf-precio"><b data-i18n="membres.t2.price">$50.000</b><span data-i18n="membres.t2.priceu">/ mes · o US$15 por PayPal</span></p></div>
+          <div class="inf-nivel-que"><p data-i18n="membres.t2.p">Tu aporte crece y sostiene programas con más alcance.</p><p class="tier-more" data-i18n="membres.t2.more">Todo lo de Semilla, y además:</p><ul class="inf-lista"><li data-i18n="membres.t2.b1">Acceso al Programa de Gratitud</li></ul></div>
+          <div class="inf-nivel-prep"><span class="inf-pend" data-i18n="membres.prep">En preparación</span> <span class="inf-pend-p" data-i18n="membres.t2.soon">Certificado de agradecimiento personalizado y contenido especial de voluntariado e impacto.</span></div>
+        </div>
+        <div class="inf-nivel">
+          <div class="inf-nivel-nom"><h3 class="inf-h3" data-i18n="membres.t3.t">Árbol</h3><p class="inf-precio"><b data-i18n="membres.t3.price">$120.000</b><span data-i18n="membres.t3.priceu">/ mes · o US$35 por PayPal</span></p></div>
+          <div class="inf-nivel-que"><p data-i18n="membres.t3.p">Un compromiso firme. Con aportes de este tamaño la red puede planear el trabajo con las fundaciones, no solo responder a la urgencia.</p><p class="tier-more" data-i18n="membres.t3.more">Todo lo de Retoño.</p></div>
+          <div class="inf-nivel-prep"><span class="inf-pend" data-i18n="membres.prep">En preparación</span> <span class="inf-pend-p" data-i18n="membres.t3.soon">Invitación a eventos y sesiones en vivo, acceso prioritario a Impact Journey y certificado de impacto personalizado.</span></div>
+        </div>
+        <div class="inf-nivel">
+          <div class="inf-nivel-nom"><h3 class="inf-h3" data-i18n="membres.t4.t">Bosque</h3><p class="inf-precio"><b data-i18n="membres.t4.price">$250.000+</b><span data-i18n="membres.t4.priceu">/ mes · o US$75+ por PayPal</span></p></div>
+          <div class="inf-nivel-que"><p data-i18n="membres.t4.p">El nivel más alto: sostienes la red completa, la base estable sobre la que crecen las demás formas de aportar.</p><p class="tier-more" data-i18n="membres.t4.more">Todo lo de Árbol.</p></div>
+          <div class="inf-nivel-prep"><span class="inf-pend" data-i18n="membres.prep">En preparación</span> <span class="inf-pend-p" data-i18n="membres.t4.soon">Reportes de impacto detallados y reunión con el fundador.</span></div>
+        </div>
+        </div>
+      </section>
+
+      <section class="inf-sec" aria-labelledby="mb-extra-t">
+        <div class="inf-lado">
+          <span class="ey" data-i18n="membres.extra.ey">Otras formas</span>
+          <h2 id="mb-extra-t" class="inf-h2" data-i18n="membres.extra.t">No todo es mensual.</h2>
+        </div>
+        <dl class="inf-cuerpo inf-filas inf-filas-anchas">
+          <div class="inf-fila"><dt data-i18n="membres.temp.t">Temporal</dt><dd data-i18n="membres.temp.p">Una donación única, sin compromiso recurrente. Igual puedes pedir tu certificado de donación y, si declaras renta en Colombia, el descuento del Art. 257 ET puede aplicarte.</dd></div>
+          <div class="inf-fila"><dt data-i18n="membres.honor.t">Honor</dt><dd data-i18n="membres.honor.p">Un reconocimiento por invitación, para aliados y personas que dejan una huella excepcional en el ecosistema.</dd></div>
+        </dl>
+      </section>
+
+      <section class="inf-sec" aria-labelledby="mb-ben-t">
+        <div class="inf-lado">
+          <span class="ey" data-i18n="membres.ben.ey">Lo que recibes</span>
+          <h2 id="mb-ben-t" class="inf-h2" data-i18n="membres.ben.t">Beneficios que crecen contigo.</h2>
+        </div>
+        <div class="inf-cuerpo">
+          <dl class="inf-filas inf-filas-anchas">
+            <div class="inf-fila"><dt data-i18n="membres.ben.1.t">Programa de Gratitud</dt><dd data-i18n="membres.ben.1.p">Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño, y para los miembros de honor; estamos sumando aliados.</dd></div>
+            <div class="inf-fila"><dt data-i18n="membres.ben.2.t">Certificado y carnet</dt><dd data-i18n="membres.ben.2.p">Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.</dd></div>
+            <div class="inf-fila"><dt data-i18n="membres.ben.3.t">El acta de cada entrega</dt><dd data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.</dd></div>
+            <div class="inf-fila"><dt data-i18n="membres.ben.4.t">Trazabilidad total</dt><dd data-i18n="membres.ben.4.p">Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.</dd></div>
+          </dl>
+      <div class="verif-door"><div class="verif-door-txt"><h3 data-i18n="verif.door.t">¿Atiendes un comercio aliado?</h3><p data-i18n="verif.door.p">Comprueba que el carnet de un miembro esté vigente: escribe su código o su número de cédula, o escanea su QR con tu propio celular.</p></div><a class="btn btn-o verif-door-btn" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet de membresía</span></a></div>
+        </div>
+      </section>
     </div>
-  </section>
-  <section>
-    <div class="wrap">
-      <span class="ey rv" data-i18n="membres.extra.ey">Otras formas</span>
-      <h2 class="h-sec rv" data-i18n="membres.extra.t">No todo es mensual.</h2>
-      <div class="grid g2 rv d1" style="margin-top:24px">
-        <div class="card"><h3 data-i18n="membres.temp.t">Temporal</h3><p data-i18n="membres.temp.p">Una donación única, sin compromiso recurrente. Igual puedes pedir tu certificado de donación y, si declaras renta en Colombia, el descuento del Art. 257 ET puede aplicarte.</p></div>
-        <div class="card"><h3 data-i18n="membres.honor.t">Honor</h3><p data-i18n="membres.honor.p">Un reconocimiento por invitación, para aliados y personas que dejan una huella excepcional en el ecosistema.</p></div>
-      </div>
-    </div>
-  </section>
-  <section class="band">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="membres.ben.ey">Lo que recibes</span>
-      <h2 class="h-sec rv" data-i18n="membres.ben.t">Beneficios que crecen contigo.</h2>
-      <div class="grid g2 rv d1" style="margin-top:22px">
-        <div class="card card-d"><h3 data-i18n="membres.ben.1.t">Programa de Gratitud</h3><p data-i18n="membres.ben.1.p">Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño, y para los miembros de honor; estamos sumando aliados.</p></div>
-        <div class="card card-d"><h3 data-i18n="membres.ben.2.t">Certificado y carnet</h3><p data-i18n="membres.ben.2.p">Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.</p></div>
-        <div class="card card-d"><h3 data-i18n="membres.ben.3.t">El acta de cada entrega</h3><p data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.</p></div>
-        <div class="card card-d"><h3 data-i18n="membres.ben.4.t">Trazabilidad total</h3><p data-i18n="membres.ben.4.p">Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.</p></div>
-      </div>
-      <div class="verif-door rv d2"><div class="verif-door-txt"><h3 data-i18n="verif.door.t">¿Atiendes un comercio aliado?</h3><p data-i18n="verif.door.p">Comprueba que el carnet de un miembro esté vigente: escribe su código o su número de cédula, o escanea su QR con tu propio celular.</p></div><a class="btn btn-o verif-door-btn" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet de membresía</span></a></div>
-    </div>
-  </section>
+
   <!-- HAZTE MIEMBRO (30 sep 2026). Era una caja centrada con cuatro montos y un
        botón; ahora es una hoja en dos columnas: a la izquierda lo que se
        promete, a la derecha lo que se elige. Y se elige una cosa más que antes:

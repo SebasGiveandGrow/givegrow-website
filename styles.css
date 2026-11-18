@@ -354,18 +354,7 @@ section{padding:72px 0}
 .card-empty:hover{transform:none;box-shadow:none}
 .card-empty h3{color:var(--ink)}
 .card-empty p{color:var(--mu)}
-.tier-price{margin:4px 0 10px}
-.tier-price b{font-family:var(--font-display);font-size:23px;color:var(--acc)}
-.tier-price span{font-size:var(--fs-13);color:var(--mu);margin-left:6px}
 .tier-more{font-size:var(--fs-13);font-weight:700;color:var(--ink);margin:14px 0 8px}
-.tier-ben{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:7px}
-.tier-ben li{position:relative;padding-left:20px;font-size:var(--fs-14);color:var(--mu);line-height:1.45}
-.tier-ben li::before{content:"";position:absolute;left:2px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--bg);border:2px solid var(--acc)}
-/* Lo que todavía no existe va junto y al pie, tras una regla fina: una nota de
-   informe, no una insignia por beneficio. Sin viñeta, para que nada pendiente
-   se confunda con la lista de lo que ya se entrega. */
-.card .tier-soon{margin:16px 0 0;padding-top:12px;border-top:1px solid var(--bd);font-size:var(--fs-13);line-height:1.5;color:var(--mu)}
-.tier-soon b{display:block;margin-bottom:3px;font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--mu)}
 .cta-note{font-size:var(--fs-13);color:var(--mu);max-width:480px;margin:22px auto 0;line-height:1.5}
 .card .ic{width:46px;height:46px;border-radius:12px;background:var(--gl);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
 .card :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:19px;margin-bottom:8px}
@@ -823,7 +812,9 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
    Reglas finas y una cifra: el nombre de cada sección a la izquierda, sus
    filas a la derecha, regla fuerte al abrir la sección y fina entre filas.
    Todo con tokens, así que el modo noche sale solo. */
-.inf .wrap{padding-top:72px;padding-bottom:96px}
+/* En el contenedor y no en <main>: el router reescribe la clase de cada
+   página al mostrarla («page active») y borraba un `.inf` puesto ahí. */
+.inf-wrap{padding-top:72px;padding-bottom:96px}
 .inf-cab,.inf-sec{display:grid;grid-template-columns:minmax(200px,260px) minmax(0,1fr);gap:24px 48px}
 .inf-cab{padding-bottom:56px}
 .inf-sec{border-top:2px solid var(--ink);padding:32px 0 40px}
@@ -868,14 +859,35 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .inf-docs{margin:0 0 24px;padding:0;list-style:none;border-top:1px solid var(--bd)}
 .inf-docs li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 24px;padding:14px 0;border-bottom:1px solid var(--bd)}
 .inf-docs .inf-nota{margin:0}
+/* Los niveles de Membresías: una fila por nivel en tres columnas — el nombre
+   y el monto, lo que recibes, lo que está en preparación. */
+.inf-niveles{border-top:1px solid var(--bd)}
+.inf-nivel{display:grid;grid-template-columns:minmax(190px,.9fr) minmax(0,1.6fr) minmax(0,1.1fr);gap:8px 28px;padding:22px 0;border-bottom:1px solid var(--bd)}
+.inf-nivel-nom{min-width:0}
+.inf-h3{margin:0;font-family:var(--font-display);font-weight:600;font-size:20px;letter-spacing:var(--tr-heading)}
+.inf-precio{margin:6px 0 0;display:flex;flex-direction:column;gap:2px}
+.inf-precio b{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.1vw,28px);white-space:nowrap;line-height:1.1;letter-spacing:-.02em;color:var(--acc)}
+.inf-precio span{font-size:var(--fs-13);color:var(--mu)}
+.inf-nivel-que p{margin:0;color:var(--ink-soft);line-height:1.55}
+.inf-nivel-que .tier-more{margin-top:10px;font-weight:600;color:var(--ink)}
+.inf-lista{margin:8px 0 0;padding:0 0 0 18px;color:var(--ink-soft);line-height:1.55}
+.inf-lista li + li{margin-top:4px}
+.inf-nivel-prep{font-size:var(--fs-15);color:var(--ink-soft)}
+/* Más específico que .verif-door, que se declara después con su propio margen. */
+.inf-cuerpo .verif-door{margin-top:28px}
 @media(max-width:760px){
-  .inf .wrap{padding-top:40px;padding-bottom:64px}
+  .inf-wrap{padding-top:40px;padding-bottom:64px}
   .inf-cab,.inf-sec{grid-template-columns:minmax(0,1fr);gap:16px}
   .inf-cab{padding-bottom:40px}
   .inf-fila{grid-template-columns:minmax(0,1fr);gap:2px}
+  .inf-nivel{grid-template-columns:minmax(0,1fr);gap:10px}
+}
+@media(min-width:761px) and (max-width:1000px){
+  .inf-nivel{grid-template-columns:minmax(170px,.9fr) minmax(0,2fr)}
+  .inf-nivel-prep{grid-column:2}
 }
 @media print{
-  .inf .wrap{padding-top:0;padding-bottom:0}
+  .inf-wrap{padding-top:0;padding-bottom:0}
   .inf-sec{break-inside:avoid;page-break-inside:avoid;padding:14pt 0 16pt}
   .inf-nit{font-size:40pt}
   .inf-nit-pie .btn{display:none}
@@ -937,9 +949,6 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .eco-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--surface);font-size:var(--fs-14);font-weight:600;color:var(--ink)}
 .eco-chip .ic-svg{width:18px;height:18px;color:var(--acc)}
 /* ---- dark cards on navy band ---- */
-.band .card-d{background:var(--on-dark-fill-2);border:1px solid var(--on-dark-fill)}
-.band .card-d h3{color:var(--on-dark)}
-.band .card-d p{color:var(--on-dark-3)}
 /* ---- CTA box ---- */
 .cta-box{margin-top:34px;text-align:center;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:34px}
 .cta-box :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:22px;margin-bottom:8px}
