@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=6dcf7d09">
+<link rel="stylesheet" href="/styles.css?v=fd9b2243">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=9b2228ad" defer></script>
+<script src="/app.js?v=f2e77d16" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -2671,122 +2671,145 @@
   </section>
 </main>
 
-<main id="page-transparencia" class="page">
-  <section>
-    <div class="wrap prose">
-      <!-- Cabecera y pie de hoja: no existen en pantalla, solo al imprimir.
-           Fase 3 del plan visual — Transparencia como hoja en carta. -->
-      <div class="transp-cab solo-impresion" aria-hidden="true">
-        <span>Fundación Give&amp;Grow International</span>
-        <span data-i18n="transp.ey">Transparencia</span>
+<main id="page-transparencia" class="page inf">
+  <!-- TRANSPARENCIA COMO INFORME (17 nov 2026, rediseño v5: reglas finas y una
+       cifra). Se lee como un informe anual: el nombre de cada sección a la
+       izquierda, sus filas a la derecha, una regla fuerte al abrir y una fina
+       entre filas. Sin tarjetas. El elemento firma es el NIT en grande: es lo
+       más verificable que tiene la fundación, y no hay cifra financiera
+       validada que poner en su lugar. -->
+  <div class="wrap">
+    <!-- Cabecera y pie de hoja: no existen en pantalla, solo al imprimir. -->
+    <div class="transp-cab solo-impresion" aria-hidden="true">
+      <span>Fundación Give&amp;Grow International</span>
+      <span data-i18n="transp.ey">Transparencia</span>
+    </div>
+
+    <div class="inf-cab">
+      <div class="inf-lado">
+        <span class="ey" data-i18n="transp.ey">Transparencia</span>
+        <p class="inf-nota" data-i18n="transp.sub">Informe de la entidad</p>
       </div>
-      <span class="ey rv" data-i18n="transp.ey">Transparencia</span>
-      <h1 class="h-sec rv" data-i18n="transp.t">Cuentas claras.</h1>
-      <p class="rv d1" data-i18n="transp.p1">Somos una Entidad Sin Ánimo de Lucro (ESAL) colombiana, constituida formalmente y bajo inspección del Estado. Aquí están nuestros datos de registro, gobernanza y compromisos financieros, verificables de forma independiente.</p>
-      <p class="rv d2" data-i18n="transp.p2">Creemos que la confianza se demuestra con hechos y documentos, no con promesas.</p>
+      <div class="inf-cuerpo">
+        <h1 class="inf-h1" data-i18n="transp.t">Cuentas claras.</h1>
+        <p class="inf-lead" data-i18n="transp.p1">Somos una Entidad Sin Ánimo de Lucro (ESAL) colombiana, constituida formalmente y bajo inspección del Estado. Aquí están nuestros datos de registro, gobernanza y compromisos financieros, verificables de forma independiente.</p>
+        <p class="inf-cita" data-i18n="transp.p2">Creemos que la confianza se demuestra con hechos y documentos, no con promesas.</p>
+      </div>
     </div>
-  </section>
 
-  <section class="cream">
-    <div class="wrap">
-      <h2 class="h-sec rv" data-i18n="transp.reg.t" style="margin-bottom:20px">Registro oficial</h2>
-      <dl class="libro rv d1">
-          <div class="libro-fila"><dt data-i18n="transp.reg.razon">Razón social</dt><dd>Fundación Give&Grow International</dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.nit">NIT</dt><dd class="transp-fila">901.948.930-2</dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.nat">Naturaleza jurídica</dt><dd><span data-i18n="transp.reg.nat.v">ESAL - Régimen Tributario Especial (Código 04, DIAN)</span></dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.insc">Inscripción Cámara de Comercio</dt><dd class="transp-fila">21-022354-22</dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.const">Constitución</dt><dd><span data-i18n="transp.reg.const.v">Documento privado del 11 de abril de 2025, registrado el 19 de mayo de 2025 (No. 1889, Libro I).</span></dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.dom">Domicilio principal</dt><dd>Carrera 82 A # 9 A Sur 28, Medellín</dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.dur">Duración</dt><dd><span data-i18n="transp.reg.dur.v">Indefinida</span></dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.reg.niif">Grupo NIIF</dt><dd><span data-i18n="transp.reg.niif.v">Grupo II</span></dd></div>
-        </dl>
-    </div>
-  </section>
+    <section class="inf-sec" aria-labelledby="inf-nit-t">
+      <div class="inf-lado">
+        <h2 id="inf-nit-t" class="inf-ey" data-i18n="transp.nit.t">Número de identificación tributaria</h2>
+        <p class="inf-nota" data-i18n="transp.nit.p">El número con que cualquiera puede comprobar que existimos, quién nos representa y que estamos al día.</p>
+      </div>
+      <div class="inf-cuerpo inf-nit-caja">
+        <p class="inf-nit">901.948.930-2</p>
+        <div class="inf-nit-pie">
+          <a class="btn btn-g" href="https://www.rues.org.co" target="_blank" rel="noopener"><span data-i18n="transp.verify.btn">Consultar en el RUES</span> <span aria-hidden="true">&rarr;</span></a>
+          <span class="inf-nota" data-i18n="transp.nit.est">ESAL · Régimen Tributario Especial · vigilada por la Gobernación de Antioquia</span>
+        </div>
+      </div>
+    </section>
 
-  <section class="band">
-    <div class="wrap">
-      <h2 class="h-sec rv" data-i18n="transp.gov.t" style="margin-bottom:14px">Gobernanza y control</h2>
-      <p class="lead rv d1" data-i18n="transp.gov.p">La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social. Su máximo órgano de dirección es el que definen sus estatutos: hoy, el fundador. Tiene Representante Legal y Revisora Fiscal, y todavía no tiene junta directiva; la acompaña una Junta de Asesores consultiva.</p>
-      <dl class="libro rv d2" style="margin-top:26px">
-          <div class="libro-fila"><dt data-i18n="transp.gov.rep">Representante legal y fundador</dt><dd>Juan Sebastián Navarro Osorio</dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.gov.rf">Revisora Fiscal</dt><dd class="transp-fila">Manuela Londoño Arboleda - T.P. 244894-T</dd></div>
+    <section class="inf-sec" aria-labelledby="inf-reg-t">
+      <div class="inf-lado"><h2 id="inf-reg-t" class="inf-h2" data-i18n="transp.reg.t">Registro oficial</h2></div>
+      <dl class="inf-cuerpo inf-filas">
+        <div class="inf-fila"><dt data-i18n="transp.reg.razon">Razón social</dt><dd>Fundación Give&amp;Grow International</dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.reg.nat">Naturaleza jurídica</dt><dd><span data-i18n="transp.reg.nat.v">ESAL - Régimen Tributario Especial (Código 04, DIAN)</span></dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.reg.insc">Inscripción Cámara de Comercio</dt><dd class="transp-fila">21-022354-22</dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.reg.const">Constitución</dt><dd><span data-i18n="transp.reg.const.v">Documento privado del 11 de abril de 2025, registrado el 19 de mayo de 2025 (No. 1889, Libro I).</span></dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.reg.dom">Domicilio principal</dt><dd>Carrera 82 A # 9 A Sur 28, Medellín</dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.reg.dur">Duración</dt><dd><span data-i18n="transp.reg.dur.v">Indefinida</span></dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.reg.niif">Grupo NIIF</dt><dd><span data-i18n="transp.reg.niif.v">Grupo II</span></dd></div>
+      </dl>
+    </section>
+
+    <section class="inf-sec" aria-labelledby="inf-gob-t">
+      <div class="inf-lado"><h2 id="inf-gob-t" class="inf-h2" data-i18n="transp.gov.t">Gobernanza y control</h2></div>
+      <div class="inf-cuerpo">
+        <p class="inf-parr" data-i18n="transp.gov.p">La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social. Su máximo órgano de dirección es el que definen sus estatutos: hoy, el fundador. Tiene Representante Legal y Revisora Fiscal, y todavía no tiene junta directiva; la acompaña una Junta de Asesores consultiva.</p>
+        <dl class="inf-filas">
+          <div class="inf-fila"><dt data-i18n="transp.gov.rep">Representante legal y fundador</dt><dd>Juan Sebastián Navarro Osorio</dd></div>
+          <div class="inf-fila"><dt data-i18n="transp.gov.rf">Revisora Fiscal</dt><dd class="transp-fila">Manuela Londoño Arboleda · T.P. 244894-T</dd></div>
           <!-- Junta de Asesores (14 oct 2026, decisión de Sebas): se publica con ese
                nombre y sin los nombres de sus integrantes. Es consultiva: emite
                conceptos previos y NUNCA «aprueba» ni dirige. -->
-          <div class="libro-fila"><dt data-i18n="transp.gov.ba">Junta de Asesores</dt><dd><span data-i18n="transp.gov.ba.v">Cinco personas, de carácter consultivo: emite conceptos y recomendaciones previas; no aprueba ni dirige.</span></dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.gov.over">Inspección, vigilancia y control</dt><dd><span data-i18n="transp.gov.over.v">Gobernación de Antioquia</span></dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.gov.surplus">Destinación de excedentes</dt><dd><span data-i18n="transp.gov.surplus.v">Prohibida su distribución; los excedentes se reinvierten en el objeto social, como exige la ley.</span></dd></div>
+          <div class="inf-fila"><dt data-i18n="transp.gov.ba">Junta de Asesores</dt><dd><span data-i18n="transp.gov.ba.v">Cinco personas, de carácter consultivo: emite conceptos y recomendaciones previas; no aprueba ni dirige.</span></dd></div>
+          <div class="inf-fila"><dt data-i18n="transp.gov.over">Inspección, vigilancia y control</dt><dd><span data-i18n="transp.gov.over.v">Gobernación de Antioquia</span></dd></div>
+          <div class="inf-fila"><dt data-i18n="transp.gov.surplus">Destinación de excedentes</dt><dd><span data-i18n="transp.gov.surplus.v">Prohibida su distribución; los excedentes se reinvierten en el objeto social, como exige la ley.</span></dd></div>
         </dl>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap prose">
-      <h2 class="h-sec rv" data-i18n="transp.fin.t">Compromiso financiero</h2>
-      <p class="rv d1" data-i18n="transp.fin.p">Cumplimos las obligaciones de una ESAL bajo Régimen Tributario Especial:</p>
-      <ul class="rv d1">
-        <li data-i18n="transp.fin.1">Estados financieros bajo NIIF (Grupo II), firmados por el Representante Legal y por la Revisora Fiscal Manuela Londoño Arboleda (T.P. 244894-T).</li>
-        <li data-i18n="transp.fin.2">Declaración de renta anual ante la DIAN (Formulario 110).</li>
-        <li data-i18n="transp.fin.3">Actualización anual del Registro Web RTE (Formato 5245).</li>
-        <li data-i18n="transp.fin.4">Certificado de donación expedido conforme a la ley, por cada aporte que lo solicite.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="cream">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="transp.funds.ey">A dónde va tu aporte</span>
-      <h2 class="h-sec rv" data-i18n="transp.funds.t">Tu aporte, con destino claro.</h2>
-      <p class="rv d1" data-i18n="transp.funds.p">Somos una fundación joven: el destino de cada aporte se respalda con su recibo y, cuando la fundación entrega, con el acta firmada y sus fotos en el rastreo. Estos son nuestros principios y nuestro compromiso.</p>
-      <div class="grid g2 rv d2" style="margin-top:22px">
-        <div class="card"><h2 data-i18n="transp.funds.model.t" class="h-comp3">Fondo común, con opción de dirigir</h2><p data-i18n="transp.funds.model.p">Por defecto tu aporte va a un fondo común que asignamos a la necesidad más urgente. Si lo prefieres, puedes dirigirlo a una fundación o ruta específica.</p></div>
-        <div class="card"><h2 data-i18n="transp.funds.commit.t" class="h-comp3">Nuestro compromiso</h2><ul class="tier-ben" style="margin-top:12px"><li data-i18n="transp.funds.a">La misión: fundaciones, comunidades y logística de entrega.</li><li data-i18n="transp.funds.b">La operación del HUB SOCIAL: bodega, transporte, verificación y trazabilidad.</li><li data-i18n="transp.funds.c">La administración indispensable. La proporción entre misión, operación y administración la publicaremos cuando la valide la Revisora Fiscal.</li></ul></div>
       </div>
-      <p class="mu rv d2" style="margin-top:16px;font-size:14px" data-i18n="transp.funds.note">Estamos definiendo el marco exacto de asignación —qué proporción va a la misión, a la operación y a la administración— con nuestra Revisora Fiscal. Publicaremos las cifras precisas solo cuando estén validadas: evidencia, no promesas.</p>
-    </div>
-  </section>
+    </section>
 
-  <section class="cream">
-    <div class="wrap prose">
-      <h2 class="h-sec rv" data-i18n="transp.trace.t">Trazabilidad de cada aporte</h2>
-      <p class="rv d1" data-i18n="transp.trace.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pides certificado de donación, se emite revisado y firmado.</p>
-      <p class="rv d2" style="margin-top:10px"><a class="card-link" href="/teoria-de-cambio"><span data-i18n="transp.toc.link">Teoría de cambio: qué medimos y qué todavía no</span> <span aria-hidden="true">&rarr;</span></a></p>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <div class="grid g2">
-        <div class="card rv">
-          <h2 data-i18n="transp.verify.t" class="h-comp3">Verifícalo tú mismo</h2>
-          <p data-i18n="transp.verify.p">Nuestro Certificado de Existencia y Representación Legal es público. Puedes consultar la entidad en el RUES con el NIT 901.948.930-2.</p>
-          <a class="btn btn-g" href="https://www.rues.org.co" target="_blank" rel="noopener" data-i18n="transp.verify.btn" style="margin-top:16px">Consultar en el RUES</a>
-        </div>
-        <div class="card rv d1">
-          <h2 data-i18n="transp.docs.t" class="h-comp3">Documentos públicos</h2>
-          <p data-i18n="transp.docs.p">Descarga los disponibles; el resto, a solicitud por correo:</p>
-          <ul style="margin:10px 0 16px 18px;color:var(--mu);font-size:15px">
-            <li><a href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" style="color:var(--acc);font-weight:600" data-i18n="transp.docs.3">Estados financieros 2025, firmados por el Representante Legal y la Revisora Fiscal (PDF)</a></li>
-            <li><a href="/docs/informe-gestion-2025.pdf" target="_blank" rel="noopener" style="color:var(--acc);font-weight:600" data-i18n="transp.docs.5">Informe de gestión 2025: año de constitución, sin proyectos ejecutados (PDF)</a></li>
-            <li data-i18n="transp.docs.1">Certificado de Existencia y Representación Legal</li>
-            <li data-i18n="transp.docs.2">Registro Único Tributario (RUT)</li>
-            <li data-i18n="transp.docs.4">Declaración de renta (Formulario 110)</li>
-          </ul>
-          <a class="btn btn-o" href="mailto:contabilidad@thegiveandgrowproject.org?subject=Solicitud%20de%20documentos" data-i18n="transp.docs.btn">Solicitar documentos</a>
-        </div>
+    <section class="inf-sec" aria-labelledby="inf-obl-t">
+      <div class="inf-lado">
+        <h2 id="inf-obl-t" class="inf-h2" data-i18n="transp.obl.t">Obligaciones</h2>
+        <p class="inf-nota" data-i18n="transp.obl.p">Lo que una ESAL del Régimen Tributario Especial tiene que cumplir, y dónde se puede ver.</p>
       </div>
-
-      <!-- El sello: NIT + RTE. Único elemento firma de la hoja. Solo impreso. -->
-      <div class="transp-sello solo-impresion" aria-hidden="true">
-        <b>NIT 901.948.930-2</b>
-        <small data-i18n="transp.sello.rte">Régimen Tributario Especial</small>
+      <div class="inf-cuerpo inf-tabla-caja">
+        <table class="inf-tabla">
+          <thead><tr><th scope="col" data-i18n="transp.obl.c1">Obligación</th><th scope="col" data-i18n="transp.obl.c2">Ante quién</th><th scope="col" data-i18n="transp.obl.c3">Dónde verlo</th></tr></thead>
+          <tbody>
+            <tr><th scope="row" data-i18n="transp.obl.1a">Estados financieros bajo NIIF, Grupo II</th><td data-i18n="transp.obl.1b">Firmados por el Representante Legal y la Revisora Fiscal</td><td><a href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" data-i18n="transp.obl.1c">2025, en PDF</a></td></tr>
+            <tr><th scope="row" data-i18n="transp.obl.2a">Declaración de renta (formulario 110)</th><td data-i18n="transp.obl.2b">DIAN, cada año</td><td data-i18n="transp.sol">A solicitud</td></tr>
+            <tr><th scope="row" data-i18n="transp.obl.3a">Actualización del Registro Web RTE (formato 5245)</th><td data-i18n="transp.obl.3b">DIAN, cada año</td><td data-i18n="transp.obl.3c">Registro público de la DIAN</td></tr>
+            <tr><th scope="row" data-i18n="transp.obl.4a">Certificado de donación</th><td data-i18n="transp.obl.4b">Por cada aporte que lo pida, firmado por el Representante Legal y la Revisora Fiscal</td><td data-i18n="transp.obl.4c">Se pide al donar</td></tr>
+          </tbody>
+        </table>
       </div>
-      <p class="transp-pie solo-impresion" aria-hidden="true">
-        <span data-i18n="transp.pie">thegiveandgrowproject.org · contabilidad@thegiveandgrowproject.org · Fundación Give&amp;Grow International, Medellín, Colombia</span>
-        · <span data-i18n="transp.impreso">Impreso el</span> <span id="transp-fecha"></span>
-      </p>
+    </section>
+
+    <section class="inf-sec" aria-labelledby="inf-dest-t">
+      <div class="inf-lado"><h2 id="inf-dest-t" class="inf-h2" data-i18n="transp.funds.ey">A dónde va tu aporte</h2></div>
+      <dl class="inf-cuerpo inf-filas inf-filas-anchas">
+        <div class="inf-fila"><dt data-i18n="transp.funds.model.t">Fondo común, con opción de dirigir</dt><dd data-i18n="transp.funds.model.p">Por defecto tu aporte va a un fondo común que asignamos a la necesidad más urgente. Si lo prefieres, puedes dirigirlo a una fundación o ruta específica.</dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.funds.uso.t">En qué se usa</dt><dd data-i18n="transp.funds.uso.p">La misión: fundaciones, comunidades y la logística de entrega. La operación del HUB SOCIAL: bodega, transporte, verificación y trazabilidad. Y la administración indispensable.</dd></div>
+        <div class="inf-fila"><dt data-i18n="transp.funds.prop.t">La proporción entre las tres</dt><dd><span class="inf-pend" data-i18n="transp.funds.pend">Pendiente de validar</span><span class="inf-pend-p" data-i18n="transp.funds.prop.p">La publicamos cuando la valide la Revisora Fiscal. Evidencia, no promesas.</span></dd></div>
+      </dl>
+    </section>
+
+    <section class="inf-sec" aria-labelledby="inf-traz-t">
+      <div class="inf-lado">
+        <h2 id="inf-traz-t" class="inf-h2" data-i18n="transp.trace.t">El recorrido de un aporte</h2>
+        <p class="inf-nota" data-i18n="transp.trace.sub">En este orden, y cada paso con su documento.</p>
+      </div>
+      <div class="inf-cuerpo">
+        <ol class="inf-pasos">
+          <li><span class="inf-paso-n" aria-hidden="true">1</span><b data-i18n="transp.trace.1t">Recibo y número de guía</b><span data-i18n="transp.trace.1p">Al confirmarse el pago.</span></li>
+          <li><span class="inf-paso-n" aria-hidden="true">2</span><b data-i18n="transp.trace.2t">Acta firmada y fotos</b><span data-i18n="transp.trace.2p">En tu rastreo, cuando la fundación entrega.</span></li>
+          <li><span class="inf-paso-n" aria-hidden="true">3</span><b data-i18n="transp.trace.3t">Certificado de donación</b><span data-i18n="transp.trace.3p">Si lo pides: revisado y firmado.</span></li>
+        </ol>
+        <p class="inf-mas"><a class="card-link" href="/teoria-de-cambio"><span data-i18n="transp.toc.link">Teoría de cambio: qué medimos y qué todavía no</span> <span aria-hidden="true">&rarr;</span></a></p>
+      </div>
+    </section>
+
+    <section class="inf-sec" aria-labelledby="inf-docs-t">
+      <div class="inf-lado">
+        <h2 id="inf-docs-t" class="inf-h2" data-i18n="transp.docs.t">Documentos públicos</h2>
+        <p class="inf-nota" data-i18n="transp.docs.p">Los que están publicados se descargan aquí; el resto te lo enviamos por correo.</p>
+      </div>
+      <div class="inf-cuerpo">
+        <ul class="inf-docs">
+          <li><span data-i18n="transp.docs.3n">Estados financieros 2025, firmados por el Representante Legal y la Revisora Fiscal</span><a href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" data-i18n="transp.docs.dl">Descargar PDF</a></li>
+          <li><span data-i18n="transp.docs.5n">Informe de gestión 2025: año de constitución, sin proyectos ejecutados</span><a href="/docs/informe-gestion-2025.pdf" target="_blank" rel="noopener" data-i18n="transp.docs.dl">Descargar PDF</a></li>
+          <li><span data-i18n="transp.docs.1">Certificado de Existencia y Representación Legal</span><span class="inf-nota" data-i18n="transp.sol">A solicitud</span></li>
+          <li><span data-i18n="transp.docs.2">Registro Único Tributario (RUT)</span><span class="inf-nota" data-i18n="transp.sol">A solicitud</span></li>
+          <li><span data-i18n="transp.docs.4">Declaración de renta (Formulario 110)</span><span class="inf-nota" data-i18n="transp.sol">A solicitud</span></li>
+        </ul>
+        <a class="btn btn-o" href="mailto:contabilidad@thegiveandgrowproject.org?subject=Solicitud%20de%20documentos" data-i18n="transp.docs.btn">Pedir documentos</a>
+      </div>
+    </section>
+
+    <!-- El sello: NIT + RTE. Solo impreso. -->
+    <div class="transp-sello solo-impresion" aria-hidden="true">
+      <b>NIT 901.948.930-2</b>
+      <small data-i18n="transp.sello.rte">Régimen Tributario Especial</small>
     </div>
-  </section>
+    <p class="transp-pie solo-impresion" aria-hidden="true">
+      <span data-i18n="transp.pie">thegiveandgrowproject.org · contabilidad@thegiveandgrowproject.org · Fundación Give&amp;Grow International, Medellín, Colombia</span>
+      · <span data-i18n="transp.impreso">Impreso el</span> <span id="transp-fecha"></span>
+    </p>
+  </div>
 </main>
 
 <!-- ============ CONTACTO ============ -->

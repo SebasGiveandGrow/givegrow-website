@@ -819,6 +819,68 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
   .wa:hover,.alma-fab:hover{transform:none}
 }
 
+/* ===== TRANSPARENCIA COMO INFORME (17 nov 2026, rediseño v5) =====
+   Reglas finas y una cifra: el nombre de cada sección a la izquierda, sus
+   filas a la derecha, regla fuerte al abrir la sección y fina entre filas.
+   Todo con tokens, así que el modo noche sale solo. */
+.inf .wrap{padding-top:72px;padding-bottom:96px}
+.inf-cab,.inf-sec{display:grid;grid-template-columns:minmax(200px,260px) minmax(0,1fr);gap:24px 48px}
+.inf-cab{padding-bottom:56px}
+.inf-sec{border-top:2px solid var(--ink);padding:32px 0 40px}
+.inf-lado .ey{display:block}
+.inf-cuerpo{min-width:0}
+/* El NIT se mide contra SU columna (container query), no contra la pantalla:
+   con vw se salía de la columna entre 760 y 1400 px. 13 caracteres de
+   Unbounded 600 ocupan unos 8,7 em (medido). */
+.inf-nit-caja{container-type:inline-size}
+.inf-nota{margin:10px 0 0;font-size:var(--fs-14);color:var(--mu);line-height:1.5}
+.inf-ey{margin:0;font-family:"Inter",sans-serif;font-size:var(--fs-eyebrow);letter-spacing:var(--tr-eyebrow);text-transform:uppercase;font-weight:600;color:var(--mu)}
+.inf-h1{margin:0;font-family:var(--font-display);font-weight:600;font-size:var(--fs-h1);line-height:var(--lh-tight);letter-spacing:var(--tr-display);text-wrap:balance}
+.inf-lead{margin:24px 0 0;max-width:62ch;font-size:var(--fs-lead);line-height:1.55;color:var(--ink-soft)}
+.inf-cita{margin:20px 0 0;font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:20px;color:var(--ink)}
+.inf-h2{margin:0;font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.15;letter-spacing:var(--tr-heading)}
+.inf-nit{margin:0;font-family:var(--font-display);font-weight:600;font-size:clamp(28px,11.2cqi,112px);line-height:.95;letter-spacing:-.035em;white-space:nowrap}
+.inf-nit-pie{margin-top:28px;display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center}
+.inf-nit-pie .inf-nota{margin:0;color:var(--ink-soft)}
+.inf-parr{margin:0 0 20px;max-width:64ch;color:var(--ink-soft)}
+.inf-filas{margin:0;border-top:1px solid var(--bd)}
+.inf-fila{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,2fr);gap:4px 24px;padding:14px 0;border-bottom:1px solid var(--bd)}
+.inf-fila dt{font-size:var(--fs-14);color:var(--mu);line-height:1.5}
+.inf-fila dd{margin:0;color:var(--ink);line-height:1.55}
+.inf-filas-anchas .inf-fila{padding:18px 0}
+.inf-filas-anchas dt{font-size:var(--fs-15);font-weight:600;color:var(--ink)}
+.inf-filas-anchas dd{color:var(--ink-soft)}
+.inf-pend{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid var(--amber);color:var(--amber);font-size:var(--fs-13);font-weight:600}
+.inf-pend-p{display:block;margin-top:8px}
+.inf-tabla-caja{overflow-x:auto}
+.inf-tabla{width:100%;border-collapse:collapse;font-size:var(--fs-15)}
+.inf-tabla thead th{text-align:left;padding:0 16px 10px 0;font-size:var(--fs-12);letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--mu);border-bottom:1px solid var(--ink)}
+.inf-tabla tbody th,.inf-tabla td{text-align:left;padding:14px 16px 14px 0;border-bottom:1px solid var(--bd);vertical-align:top;font-weight:400}
+.inf-tabla tbody th{color:var(--ink)}
+.inf-tabla td{color:var(--ink-soft)}
+.inf-tabla a,.inf-docs a{color:var(--acc);font-weight:600}
+.inf-pasos{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.inf-pasos li{padding:0 20px 0 0;border-top:1px solid var(--ink);display:flex;flex-direction:column;gap:4px}
+.inf-paso-n{padding-top:12px;font-family:var(--font-display);font-weight:600;font-size:var(--fs-14);color:var(--acc)}
+.inf-pasos b{margin-top:4px}
+.inf-pasos li span:last-child{font-size:var(--fs-15);color:var(--ink-soft)}
+.inf-mas{margin:24px 0 0}
+.inf-docs{margin:0 0 24px;padding:0;list-style:none;border-top:1px solid var(--bd)}
+.inf-docs li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 24px;padding:14px 0;border-bottom:1px solid var(--bd)}
+.inf-docs .inf-nota{margin:0}
+@media(max-width:760px){
+  .inf .wrap{padding-top:40px;padding-bottom:64px}
+  .inf-cab,.inf-sec{grid-template-columns:minmax(0,1fr);gap:16px}
+  .inf-cab{padding-bottom:40px}
+  .inf-fila{grid-template-columns:minmax(0,1fr);gap:2px}
+}
+@media print{
+  .inf .wrap{padding-top:0;padding-bottom:0}
+  .inf-sec{break-inside:avoid;page-break-inside:avoid;padding:14pt 0 16pt}
+  .inf-nit{font-size:40pt}
+  .inf-nit-pie .btn{display:none}
+}
+
 /* ===== responsive ===== */
 @media(max-width:1024px){
   .nlinks{display:none}
