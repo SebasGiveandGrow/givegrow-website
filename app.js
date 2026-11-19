@@ -2607,7 +2607,6 @@ var I18N = {
     "rg.inc.pagar":"Ir a pagar",
     "rg.inc.cop.p":"El pago en pesos se abre en una pestaña nueva, en la pasarela segura de Wompi. Tus regalos quedan apartados mientras pagas.",
     "rg.inc.cop.t":"Tu pedido está listo.",
-    "rg.aliada":"En alianza con {a}, nuestra fundación aliada en Estados Unidos.",
     "rg.zona.especie":"{n} ya donados en especie",
     "rg.plazo.n":"Quedan {n} días para regalar: hasta el {f}.",
     "rg.plazo.1":"Queda un día para regalar: hasta el {f}.",
@@ -2628,11 +2627,7 @@ var I18N = {
     "rg.espera.ayuda":"Escogemos por ti, dentro de los filtros que pusiste, a quien lleva más tiempo en la lista.",
     "rg.espera.ok":"Agregamos a {n}, {e}, de {z}, a tu lista.",
     "rg.espera.nadie":"Con estos filtros ya no queda nadie esperando. Prueba con otra zona o con todas.",
-    "rg.alianza.h":"Una alianza de tres organizaciones",
-    "rg.alianza.p":"Los regalos de diciembre son una alianza entre Fundación Ancla Colombia, Positive Potential y Give&Grow. Cada una pone su parte.",
-    "rg.alianza.ancla":"En Leticia, reúne con las familias los deseos de los niños y la autorización escrita de sus acudientes.",
-    "rg.alianza.pp":"En Estados Unidos recibe las donaciones en dólares, como organización sin ánimo de lucro, y le entrega el recibo a quien se lo pida.",
-    "rg.alianza.gg":"Organiza la lista, recibe los pagos en pesos y sigue cada regalo hasta su entrega, con acta.",
+    "rg.alianza.h":"Una alianza entre",
     "rg.reglas.h":"Si algo cambia, te avisamos",
     "rg.reglas.1.t":"Si otra persona pagó primero el mismo regalo",
     "rg.reglas.1.p":"Tu aporte va a otra niña u otro niño de la misma zona, con el mismo tipo de regalo si lo hay y sin pasar del valor que pagaste.",
@@ -3769,7 +3764,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "d709bca3", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "e802e7f7", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };

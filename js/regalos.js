@@ -250,11 +250,6 @@ function rgPintaZonas(){
   var abierta = !!d.campana && d.campana.estado === "abierta";
   var loc = rgLoc();
   rgPintaPlazo();
-  var al = rgEl("rg-aliada");
-  if (al) {
-    al.hidden = !(d.campana && d.campana.aliada_nombre);
-    if (!al.hidden) al.textContent = t("rg.aliada").replace("{a}", d.campana.aliada_nombre);
-  }
   var arboles = (d.zonas || []).map(function(z){
     var meta = Number(z.meta) || 0;
     return rgArbol(z, Math.min(z.entregados, meta), Math.min(z.financiados, meta));
