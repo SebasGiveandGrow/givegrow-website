@@ -49637,9 +49637,12 @@ function cabeceraPagina(m, propia, en) {
    página trata de niñas y niños, y una vista previa viaja sin control. */
 const OG_IMG_RUTA = {
   regalos: {
-    es: "/img/og-regalos.jpg", en: "/img/og-regalos-en.jpg",
-    alt: "Regalos de diciembre · Give&Grow International",
-    altEn: "December Gifts · Give&Grow International"
+    /* 19 nov 2026: la tarjeta lleva los logos de la alianza (Positive
+       Potential, Fundación Ancla Colombia y Give&Grow). Nombre nuevo a
+       propósito: así ningún rastreador sirve la imagen vieja de su caché. */
+    es: "/img/og-regalos-alianza.jpg", en: "/img/og-regalos-alianza-en.jpg",
+    alt: "Regalos de diciembre · Una alianza entre Positive Potential, Fundación Ancla Colombia y Give&Grow International",
+    altEn: "December Gifts · A partnership between Positive Potential, Fundación Ancla Colombia and Give&Grow International"
   }
 };
 /* El hreflang de una página con path propio: `es` y `x-default` a la dirección

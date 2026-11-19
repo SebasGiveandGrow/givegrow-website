@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+<!-- LA TARJETA DE /regalos AL COMPARTIR (19 nov 2026). Fuente de img/og-regalos-alianza.jpg (#es) y -en.jpg (#en). Regenerar: Chrome headless --window-size=1200,630 --screenshot sobre este archivo con #es o #en, pasar a JPG y limpiar con jpegtran -copy icc (check #24). -->
+@font-face{font-family:U;src:url(../vendor/fonts/unbounded-latin.woff2);font-weight:200 900}
+@font-face{font-family:I;src:url(../vendor/fonts/inter-latin.woff2);font-weight:100 900}
+@font-face{font-family:F;src:url(../vendor/fonts/fraunces-italic-latin.woff2);font-weight:100 900;font-style:italic}
+*{margin:0;box-sizing:border-box}
+html,body{width:1200px;height:630px;overflow:hidden;background:#fff}
+.marco{position:absolute;inset:22px;border:2px solid #C9CED4}
+.cv{position:absolute;top:0;bottom:0;left:918px;width:32px;background:#A61E2D;border-left:3px solid #D4A944;border-right:3px solid #D4A944}
+.ch{position:absolute;left:0;right:0;top:478px;height:32px;background:#A61E2D;border-top:3px solid #D4A944;border-bottom:3px solid #D4A944}
+.lazo{position:absolute;left:879px;top:463px;width:110px;height:62px}
+.txt{position:absolute;left:92px;top:74px;width:800px}
+.ey{font:700 20px/1 I;letter-spacing:.14em;color:#8A6620;text-transform:uppercase}
+h1{font:800 64px/1.02 U;color:#1F5C38;letter-spacing:-.015em;margin-top:18px}
+p{font:italic 500 28px/1.32 F;color:#191813;margin-top:18px;max-width:760px}
+.ali{position:absolute;left:92px;top:368px;width:800px;display:flex;align-items:center;gap:34px}
+.ali-t{font:500 17px/1.2 I;color:#5C636F;width:128px}
+.ali img{display:block}
+.pp{height:96px}.an{height:62px}
+.gg{font:800 33px/1 U;color:#191813;letter-spacing:-.01em}.gg em{font-style:normal;color:#2E7D4F}
+.pie{position:absolute;left:92px;top:553px;font:600 19px/1 I;color:#5C636F}
+</style></head><body>
+<div class="marco"></div><div class="ch"></div><div class="cv"></div>
+<svg class="lazo" viewBox="0 0 110 62"><g fill="#A61E2D" stroke="#D4A944" stroke-width="3" stroke-linejoin="round"><path d="M55 31 C40 10 10 2 6 16 C2 30 6 48 16 54 C30 60 44 44 55 31Z"/><path d="M55 31 C70 10 100 2 104 16 C108 30 104 48 94 54 C80 60 66 44 55 31Z"/><circle cx="55" cy="31" r="11"/></g></svg>
+<div class="txt"><div class="ey" id="ey"></div><h1 id="h"></h1><p id="p"></p></div>
+<div class="ali"><span class="ali-t" id="al"></span><img class="pp" src="positive-potential_logo.webp" alt=""><img class="an" src="ancla_logo.png" alt=""><span class="gg">Give<em>&amp;</em>Grow</span></div>
+<div class="pie" id="pie"></div>
+<script>
+const T={es:{ey:"Give&Grow · Diciembre 2026",h:"Regalos de<br>diciembre",p:"Mil regalos para niñas y niños de Uribia, Medellín y Leticia. Cada uno, seguido hasta su entrega con acta.",al:"Una alianza entre",pie:"thegiveandgrowproject.org/regalos · NIT 901.948.930-2"},
+en:{ey:"Give&Grow · December 2026",h:"December<br>Gifts",p:"A thousand gifts for children in Uribia, Medellín and Leticia. Each one followed until it is delivered and recorded.",al:"A partnership between",pie:"thegiveandgrowproject.org/regalos · Colombian nonprofit"}}[location.hash.slice(1)||"es"];
+for(const k of ["ey","p","al","pie"])document.getElementById(k).textContent=T[k];document.getElementById("h").innerHTML=T.h;
+</script></body></html>
