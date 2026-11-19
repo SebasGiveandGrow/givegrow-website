@@ -6342,6 +6342,14 @@ async function adminSalud(env, opciones) {
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
+  /* TARJETAS DEL HUB (0069): lo que una fundación quiere cambiar en su ficha pública. */
+  try {
+    await enCola("tarjetas_por_revisar",
+      "SELECT COUNT(*) AS n, MIN(actualizada) AS masViejo FROM tarjetas_fundacion WHERE estado = 'enviada'",
+      "Revisar y aprobar › Bandeja de revisión · una fundación cambió su tarjeta del HUB: revísala, escribe el inglés y publícala", 35, "#sec-revisar", 7);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   /* COSTOS DE IMPACTO (0060): lo que una fundación propuso para la calculadora. */
   try {
     await enCola("unidades_impacto_por_revisar",
@@ -22216,6 +22224,9 @@ async function adminRevisar(env) {
   await leer("unidades_impacto", "costo",
     "SELECT u.id, u.nombre_es AS titulo, u.costo_cop AS costo, i.nombre AS quien, u.actualizada AS t FROM unidades_impacto u " +
     "JOIN inscripciones i ON i.id = u.inscripcion WHERE u.estado = 'propuesta'");
+  await leer("tarjetas_fundacion", "tarjeta",
+    "SELECT t.inscripcion AS id, 'Tarjeta del HUB' AS titulo, i.nombre AS quien, t.actualizada AS t FROM tarjetas_fundacion t " +
+    "JOIN inscripciones i ON i.id = t.inscripcion WHERE t.estado = 'enviada'");
   await leer("entregas", "acta",
     "SELECT numero AS id, 'Acta ' || numero || ' · ' || sector AS titulo, 'Actas de entrega' AS quien, creada_en AS t " +
     "FROM entregas WHERE publicada_en IS NULL AND anulada_en IS NULL");
@@ -23054,6 +23065,8 @@ async function redPublica(env, origen) {
     if (!r || !r.ok) return null;
     data = await r.json();
   } catch (e) { console.error("red pública: archivo", e && e.message); return null; }
+  try { await mezclarTarjetas(env, data); }
+  catch (e) { if (!/no such table/i.test(String(e && e.message))) console.error("red pública: tarjetas", e && e.message); }
   try { await mezclarUnidadesVerificadas(env, data); }
   catch (e) { console.error("red pública: unidades verificadas", e && e.message); }
   REDPUB_CACHE = { en: Date.now(), data };
@@ -23105,6 +23118,199 @@ function unidadImpactoValida(c) {
   }
   if (!u.soporte_doc) return malo("soporte_doc", "Elige el soporte del costo. Súbelo primero en «Documentos».");
   return { ok: true, u };
+}
+
+/* ============================================================================
+   LA TARJETA DE LA FUNDACIÓN EN EL HUB, DESDE SU PORTAL (0069, 19 nov 2026)
+   ============================================================================
+   La fundación cambia en su portal lo que el público ve en su ficha —la
+   frase, quiénes son, dónde trabajan, a quién acompañan, sus programas—, en
+   español. El equipo lo revisa en /admin, escribe el inglés y, al aprobar, se
+   publica solo: `mezclarTarjetas` lo pone sobre partners.json en
+   `redPublica`. Decisión de Sebas (19 nov): su aprobación publica, sin PR.
+   Lo que sale es SIEMPRE lo último aprobado (`publicada`), aunque haya una
+   propuesta nueva esperando. */
+const TJ_MAX = { tagline: 160, about: 1400, area: 160, poblacion: 220, prog_nombre: 80, prog_desc: 700 };
+const TJ_PROG_TOPE = 6;
+const TJ_ESTADO_ES = { enviada: "Por revisar", aprobada: "Publicada", devuelta: "Devuelta" };
+
+function tjTexto(v, n, parrafo) {
+  let s = String(v == null ? "" : v).replace(/\r\n?/g, "\n");
+  s = parrafo ? s.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim() : s.replace(/\s+/g, " ").trim();
+  return s.slice(0, n);
+}
+
+/* Lo que la fundación propone, limpio. Es público: nada de correos ni
+   teléfonos (el contacto va por Give&Grow), y al menos un programa, porque
+   una tarjeta sin programas borraría los que hoy se ven. */
+function tarjetaValida(c) {
+  const malo = (campo, ayuda) => ({ ok: false, error: "dato_invalido", campo, ayuda });
+  const d = {
+    tagline: tjTexto(c.tagline, TJ_MAX.tagline),
+    about: tjTexto(c.about, TJ_MAX.about, true),
+    area: tjTexto(c.area, TJ_MAX.area),
+    poblacion: tjTexto(c.poblacion, TJ_MAX.poblacion),
+    programs: (Array.isArray(c.programs) ? c.programs : []).slice(0, TJ_PROG_TOPE)
+      .map((p) => ({ name: tjTexto(p && p.name, TJ_MAX.prog_nombre), desc: tjTexto(p && p.desc, TJ_MAX.prog_desc, true) }))
+      .filter((p) => p.name || p.desc)
+  };
+  if (d.about.length < 80) return malo("about", "Cuenta quiénes son en dos o tres frases: es lo primero que lee quien visita su ficha.");
+  if (d.area.length < 3) return malo("area", "Escribe dónde trabajan: barrio, municipio o zona.");
+  if (!d.programs.length) return malo("prog-0", "Escribe al menos un programa, con su nombre y qué hace.");
+  const k = d.programs.findIndex((p) => p.name.length < 2 || p.desc.length < 20);
+  if (k > -1) return malo("prog-" + k, "Cada programa necesita su nombre y una descripción de al menos una frase.");
+  const todo = [d.tagline, d.about, d.area, d.poblacion].concat(d.programs.map((p) => p.name + " " + p.desc)).join(" ");
+  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(todo) || /(?:\+?57[\s-]?)?\b3\d{2}[\s-]?\d{3}[\s-]?\d{4}\b/.test(todo)) {
+    return malo("about", "Sin correos ni teléfonos: la tarjeta es pública y el contacto llega por Give&Grow.");
+  }
+  return { ok: true, d };
+}
+
+/* La tarjeta que hoy se ve en el sitio, en los dos idiomas. */
+function tarjetaPublica(data, redId) {
+  if (!redId) return null;
+  const p = (data && Array.isArray(data.partners) ? data.partners : [])
+    .find((x) => x && x.type === "foundation" && String(x.id).toLowerCase() === redId);
+  if (!p) return null;
+  const pr = p.profile || {};
+  const bi = (o) => ({ es: o && typeof o === "object" ? String(o.es || "") : String(o || ""), en: o && typeof o === "object" ? String(o.en || "") : "" });
+  return { nombre: String(p.name || ""), tagline: bi(pr.tagline), about: bi(pr.about), area: bi(p.area), poblacion: bi(p.poblacion),
+    programs: (Array.isArray(pr.programs) ? pr.programs : []).map((g) => ({ name: String((g && g.name) || ""), desc: bi(g && g.desc) })) };
+}
+
+async function mezclarTarjetas(env, data) {
+  if (!env.DB) return;
+  const filas = (await env.DB.prepare(
+    "SELECT t.publicada, i.red_id FROM tarjetas_fundacion t JOIN inscripciones i ON i.id = t.inscripcion " +
+    "WHERE t.publicada IS NOT NULL AND i.red_id IS NOT NULL"
+  ).all()).results || [];
+  if (!filas.length) return;
+  const porId = new Map();
+  for (const p of (Array.isArray(data && data.partners) ? data.partners : [])) {
+    if (p && p.type === "foundation" && typeof p.id === "string") porId.set(p.id.toLowerCase(), p);
+  }
+  for (const f of filas) {
+    const p = porId.get(String(f.red_id).toLowerCase());
+    if (!p || !(p.consent && p.consent.name === true)) continue;
+    let pub;
+    try { pub = JSON.parse(f.publicada); } catch (e) { continue; }
+    if (!pub || !pub.about || !pub.about.es) continue;
+    const pr = p.profile = Object.assign({}, p.profile || {});
+    if (pub.tagline && pub.tagline.es) pr.tagline = pub.tagline; else delete pr.tagline;
+    pr.about = pub.about;
+    if (pub.area && pub.area.es) p.area = pub.area;
+    if (pub.poblacion && pub.poblacion.es) p.poblacion = pub.poblacion; else delete p.poblacion;
+    /* Un programa que ya existía con el mismo nombre conserva lo que no se
+       edita desde el portal (su logo, si es formativo). */
+    const viejos = Array.isArray(pr.programs) ? pr.programs : [];
+    if (Array.isArray(pub.programs) && pub.programs.length) {
+      pr.programs = pub.programs.map((g) => Object.assign({}, viejos.find((x) => x && x.name === g.name) || {}, { name: g.name, desc: g.desc }));
+    }
+  }
+}
+
+/* GET y POST /api/portal/tarjeta */
+async function apiPortalTarjeta(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "tarjetas_fundacion"))) return json({ error: "no_disponible" }, 503);
+  const ins = await env.DB.prepare("SELECT red_id FROM inscripciones WHERE id = ?").bind(s.inscripcion).first();
+  const redId = ins && ins.red_id ? String(ins.red_id).toLowerCase() : null;
+  if (request.method === "GET") {
+    const t = await env.DB.prepare("SELECT propuesta, estado, motivo, enviada_en FROM tarjetas_fundacion WHERE inscripcion = ?").bind(s.inscripcion).first();
+    let propuesta = null;
+    try { propuesta = t && t.propuesta ? JSON.parse(t.propuesta) : null; } catch (e) { propuesta = null; }
+    const actual = tarjetaPublica(await redPublica(env, ORIGIN), redId);
+    return json({ ok: true, red_id: actual ? redId : null, actual, propuesta,
+      estado: t ? t.estado : null, estado_es: t ? TJ_ESTADO_ES[t.estado] : null, motivo: t ? t.motivo : null,
+      enviada: t && t.enviada_en ? fechaCO(t.enviada_en) : null, maximos: TJ_MAX, tope_programas: TJ_PROG_TOPE });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c) || c.accion !== "enviar" || !esObjeto(c.datos)) return json({ error: "accion_invalida" }, 400);
+  const v = tarjetaValida(c.datos);
+  if (!v.ok) return json(v, 400);
+  await env.DB.prepare(
+    "INSERT INTO tarjetas_fundacion (inscripcion, propuesta, estado, enviada_en, actualizada) VALUES (?, ?, 'enviada', datetime('now'), datetime('now')) " +
+    "ON CONFLICT(inscripcion) DO UPDATE SET propuesta = excluded.propuesta, estado = 'enviada', motivo = NULL, enviada_en = datetime('now'), actualizada = datetime('now')"
+  ).bind(s.inscripcion, JSON.stringify(v.d)).run();
+  return json({ ok: true });
+}
+
+/* GET /api/admin/tarjetas — las enviadas primero, con lo que hoy se ve. */
+async function adminTarjetas(env) {
+  if (!(await existeTabla(env, "tarjetas_fundacion"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0069 en la base." }, 409);
+  const filas = (await env.DB.prepare(
+    "SELECT t.inscripcion, t.propuesta, t.estado, t.motivo, t.enviada_en, t.revisada_en, t.revisada_por, t.actualizada, i.nombre AS fundacion, i.red_id " +
+    "FROM tarjetas_fundacion t JOIN inscripciones i ON i.id = t.inscripcion " +
+    "ORDER BY CASE t.estado WHEN 'enviada' THEN 0 WHEN 'devuelta' THEN 1 ELSE 2 END, t.actualizada DESC"
+  ).all()).results || [];
+  const red = await redPublica(env, ORIGIN);
+  return json({ ok: true, estados: TJ_ESTADO_ES, tarjetas: filas.map((t) => {
+    let propuesta = null;
+    try { propuesta = t.propuesta ? JSON.parse(t.propuesta) : null; } catch (e) { propuesta = null; }
+    return { inscripcion: t.inscripcion, fundacion: t.fundacion, red_id: t.red_id, estado: t.estado, motivo: t.motivo, propuesta,
+      actual: tarjetaPublica(red, t.red_id ? String(t.red_id).toLowerCase() : null),
+      enviada: t.enviada_en ? selloCO(t.enviada_en).slice(0, 16) : "", revisada_por: t.revisada_por, ver: t.actualizada };
+  }) });
+}
+
+/* POST /api/admin/tarjeta/<inscripción> { accion: aprobar | devolver, ver, en, motivo }
+   Aprobar exige el inglés de cada campo que la fundación llenó: el sitio es
+   bilingüe y una mitad vacía se vería rota. */
+async function adminTarjetaDecidir(request, env, insc, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const t = await env.DB.prepare("SELECT propuesta, estado, actualizada FROM tarjetas_fundacion WHERE inscripcion = ?").bind(insc).first();
+  if (!t) return json({ error: "no_encontrado" }, 404);
+  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación la cambió mientras la revisabas. Cierra y vuelve a abrirla." }, 409);
+  if (t.estado !== "enviada" || String(c.ver || "") !== String(t.actualizada)) return cambio();
+  let r, detalle;
+  if (c.accion === "aprobar") {
+    let d;
+    try { d = JSON.parse(t.propuesta || "{}"); } catch (e) { d = {}; }
+    const en = esObjeto(c.en) ? c.en : {};
+    const progEn = Array.isArray(en.programs) ? en.programs : [];
+    const par = (campo, es, max, parrafo) => {
+      if (!es) return { valor: null };
+      const ing = tjTexto(en[campo], Math.round(max * 1.3), parrafo);
+      if (ing.length < 3) return { falta: campo };
+      return { valor: { es, en: ing } };
+    };
+    const campos = { tagline: par("tagline", d.tagline, TJ_MAX.tagline), about: par("about", d.about, TJ_MAX.about, true),
+      area: par("area", d.area, TJ_MAX.area), poblacion: par("poblacion", d.poblacion, TJ_MAX.poblacion) };
+    for (const k of Object.keys(campos)) if (campos[k].falta) return json({ error: "dato_invalido", campo: "en-" + k, ayuda: "Falta el inglés de este campo: el sitio es bilingüe." }, 400);
+    const programs = [];
+    for (let i = 0; i < (d.programs || []).length; i++) {
+      const g = d.programs[i];
+      const ing = tjTexto(progEn[i], Math.round(TJ_MAX.prog_desc * 1.3), true);
+      if (ing.length < 3) return json({ error: "dato_invalido", campo: "en-prog-" + i, ayuda: "Falta el inglés de la descripción de «" + g.name + "»." }, 400);
+      programs.push({ name: g.name, desc: { es: g.desc, en: ing } });
+    }
+    const publicada = { tagline: campos.tagline.valor, about: campos.about.valor, area: campos.area.valor, poblacion: campos.poblacion.valor, programs };
+    r = await env.DB.prepare(
+      "UPDATE tarjetas_fundacion SET estado = 'aprobada', publicada = ?, motivo = NULL, revisada_en = datetime('now'), revisada_por = ?, actualizada = datetime('now') " +
+      "WHERE inscripcion = ? AND actualizada = ? AND estado = 'enviada'"
+    ).bind(JSON.stringify(publicada), quien || null, insc, String(c.ver)).run();
+    detalle = "aprobada y publicada";
+  } else if (c.accion === "devolver") {
+    const motivo = limpiar(c.motivo, 500);
+    if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué cambiar: la fundación lo ve en su portal." }, 400);
+    r = await env.DB.prepare(
+      "UPDATE tarjetas_fundacion SET estado = 'devuelta', motivo = ?, revisada_en = datetime('now'), revisada_por = ?, actualizada = datetime('now') " +
+      "WHERE inscripcion = ? AND actualizada = ? AND estado = 'enviada'"
+    ).bind(motivo, quien || null, insc, String(c.ver)).run();
+    detalle = "devuelta";
+  } else return json({ error: "accion_invalida" }, 400);
+  if (!r.meta || !r.meta.changes) return cambio();
+  redPublicaOlvidar();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "tarjeta del HUB · inscripción " + insc + " · " + detalle).run();
+  return json({ ok: true });
 }
 
 /* GET y POST /api/portal/unidades-impacto */
@@ -23544,6 +23750,8 @@ function paginaPortal(nonce) {
   .ods-grid .op{margin-top:6px}
   .ods-n{display:inline-block;min-width:30px;margin-right:2px;font-family:"Unbounded",system-ui,sans-serif;font-weight:600;color:var(--acc)}
 
+  .tj-prog{padding:4px 0 16px;border-bottom:1px solid var(--bd);margin-bottom:6px}
+  .tj-prog:last-child{border-bottom:0}
   /* EL RECORRIDO: los cinco pasos del HUB, el elemento firma de la página. */
   .recorrido{list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:22px 0 6px;counter-reset:paso}
   .recorrido li{position:relative;padding:0 8px 0 0}
@@ -23893,6 +24101,7 @@ function paginaPortal(nonce) {
     <div class="tabs" role="tablist" aria-label="Secciones del portal">
       <button type="button" class="tab" role="tab" id="t-resumen" aria-controls="s-resumen" aria-selected="true">Resumen</button>
       <button type="button" class="tab" role="tab" id="t-perfil" aria-controls="s-perfil" aria-selected="false">Perfil<span class="pill oculto" id="tp-perfil"></span></button>
+      <button type="button" class="tab" role="tab" id="t-tarjeta" aria-controls="s-tarjeta" aria-selected="false">Tu tarjeta</button>
       <button type="button" class="tab" role="tab" id="t-documentos" aria-controls="s-documentos" aria-selected="false">Documentos<span class="pill" id="tp-docs"></span></button>
       <button type="button" class="tab" role="tab" id="t-apadrinamiento" aria-controls="s-apadrinamiento" aria-selected="false">Apadrinamiento</button>
       <button type="button" class="tab" role="tab" id="t-dar" aria-controls="s-dar" aria-selected="false">Dar y recibir</button>
@@ -24004,6 +24213,36 @@ function paginaPortal(nonce) {
           <button type="button" class="btn sec oculto" id="b-dar-cancelar">Cancelar la edición</button>
         </div>
         <span class="msg" id="m-dar" role="status" aria-live="polite"></span>
+      </form>
+    </div>
+    <div id="s-tarjeta" role="tabpanel" aria-labelledby="t-tarjeta" class="oculto">
+      <div class="tarjeta aviso">
+        <h2>Tu tarjeta en el HUB</h2>
+        <p class="sub">Es lo que ve cualquier persona en la ficha de tu fundación en thegiveandgrowproject.org. Escríbela en español: el equipo la revisa, se encarga del inglés y, al aprobarla, se publica sola.</p>
+        <p class="sub mt"><strong>Es pública:</strong> sin correos, teléfonos ni nombres de niñas, niños o familias. Las cifras, solo las que puedan comprobar.</p>
+        <p class="mt"><a id="tj-ver" class="btn sec mini oculto" href="/" target="_blank" rel="noopener">Ver mi ficha como está hoy</a></p>
+      </div>
+      <div id="tj-estado"></div>
+      <form class="tarjeta mt" id="f-tarjeta" autocomplete="off">
+        <label for="tj-tagline">Frase corta</label>
+        <span class="ayuda">Lo que los define, en una línea. Sale debajo del nombre.</span>
+        <input type="text" id="tj-tagline" maxlength="160">
+        <label for="tj-about">Quiénes son</label>
+        <span class="ayuda">Dos o tres párrafos: desde cuándo, dónde, con quién y por qué. Es lo primero que se lee.</span>
+        <textarea id="tj-about" maxlength="1400" rows="7"></textarea>
+        <label for="tj-area">Dónde trabajan</label>
+        <span class="ayuda">Barrio, municipio o zona. Nunca una dirección exacta.</span>
+        <input type="text" id="tj-area" maxlength="160">
+        <label for="tj-poblacion">A quién acompañan</label>
+        <span class="ayuda">Por ejemplo: «≈130 niñas y niños». Si es una cifra, que la puedan comprobar.</span>
+        <input type="text" id="tj-poblacion" maxlength="220">
+        <hr class="regla">
+        <h2>Sus programas</h2>
+        <div id="tj-progs"></div>
+        <p class="mt"><button type="button" class="btn sec mini" id="tj-mas">Agregar otro programa</button></p>
+        <hr class="regla">
+        <button type="submit" class="btn" id="b-tarjeta">Enviar a revisión</button>
+        <span class="msg" id="m-tarjeta" role="status" aria-live="polite"></span>
       </form>
     </div>
     <div id="s-indicadores" role="tabpanel" aria-labelledby="t-indicadores" class="oculto">
@@ -24135,7 +24374,7 @@ var PASOS = [
 ];
 var RECOMENDADOS = ["rut", "camara", "estatutos", "estados_financieros", "certificado_bancario", "logo"];
 var UNIDADES = null;
-var TABS = ["resumen", "perfil", "documentos", "apadrinamiento", "dar", "indicadores", "regalos"];
+var TABS = ["resumen", "perfil", "tarjeta", "documentos", "apadrinamiento", "dar", "indicadores", "regalos"];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -25004,6 +25243,7 @@ function irA(tab){
   if (tab === "apadrinamiento" && UNIDADES === null) cargarUnidades();
   if (tab === "indicadores" && INDS === null) cargarIndicadores();
   if (tab === "dar" && DRS === null) cargarDar();
+  if (tab === "tarjeta" && TJF === null) cargarTarjeta();
   if (tab === "regalos") { if (!D || !D.aliada_regalos) { irA("resumen"); return; } if (RG === null) cargarRegalos(); }
   TABS.forEach(function(t){
     $("t-" + t).setAttribute("aria-selected", t === tab ? "true" : "false");
@@ -25045,6 +25285,8 @@ $("pf-descartar").addEventListener("click", function(){
 });
 $("p-paso").addEventListener("click", function(){ RECORRIDO = $("p-recorrido").classList.contains("oculto"); verRecorrido(); });
 TABS.forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(t); }); });
+$("f-tarjeta").addEventListener("submit", tjEnviar);
+$("tj-mas").addEventListener("click", function(){ tjAgregar(null); });
 document.addEventListener("click", function(ev){
   var b = ev.target.closest && ev.target.closest("[data-ir]");
   if (b) { irA(b.getAttribute("data-ir")); window.scrollTo(0, 0); }
@@ -25374,6 +25616,70 @@ $("in-lista").addEventListener("click", function(ev){
   enviar("/api/portal/indicadores", { accion: "retirar", id: x.id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarIndicadores(); });
 });
 /* ---- Dar y recibir (0059): lo que ofrecen y lo que necesitan. No se publica. ---- */
+/* TU TARJETA EN EL HUB (0069): lo que el público ve en su ficha, en español.
+   El equipo la revisa, escribe el inglés y, al aprobar, se publica sola. */
+var TJF = null;
+function cargarTarjeta(){
+  return fetch("/api/portal/tarjeta", { credentials: "same-origin" }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return null; }
+    return r.ok ? r.json() : null;
+  }).then(function(d){ if (!d) { $("tj-estado").innerHTML = '<p class="sub">No pudimos cargar tu tarjeta. Intenta de nuevo.</p>'; return; } TJF = d; pintarTarjeta(); })
+    .catch(function(){ $("tj-estado").innerHTML = '<p class="sub">No pudimos cargar tu tarjeta. Intenta de nuevo.</p>'; });
+}
+function tjBase(){
+  /* Lo que se edita: la propuesta si hay una en curso o devuelta; si no, lo
+     que hoy se ve en el sitio. */
+  if (TJF.propuesta && TJF.estado !== "aprobada") return TJF.propuesta;
+  var a = TJF.actual;
+  if (!a) return TJF.propuesta || { tagline: "", about: "", area: "", poblacion: "", programs: [] };
+  return { tagline: a.tagline.es, about: a.about.es, area: a.area.es, poblacion: a.poblacion.es,
+    programs: (a.programs || []).map(function(g){ return { name: g.name, desc: g.desc.es }; }) };
+}
+function pintarTarjeta(){
+  var e = "";
+  if (TJF.estado === "enviada") e = '<div class="tarjeta aviso ambar mt"><strong>Tu cambio del ' + esc(TJF.enviada || "") + " está por revisar.</strong> Mientras tanto el sitio sigue mostrando lo anterior.</div>";
+  else if (TJF.estado === "devuelta") e = '<div class="tarjeta aviso ambar mt"><strong>El equipo te pidió un ajuste:</strong> ' + esc(TJF.motivo || "") + "</div>";
+  else if (TJF.estado === "aprobada") e = '<div class="tarjeta aviso mt"><strong>Tu tarjeta está publicada.</strong> Si algo cambia, edítala y envíala de nuevo.</div>';
+  if (!TJF.red_id) e += '<div class="tarjeta aviso mt">Tu fundación todavía no tiene ficha pública en el HUB. Puedes preparar tu tarjeta: sale cuando quede publicada tu ficha.</div>';
+  $("tj-estado").innerHTML = e;
+  $("tj-ver").classList.toggle("oculto", !TJF.red_id);
+  if (TJF.red_id) $("tj-ver").setAttribute("href", "/#fundacion/" + encodeURIComponent(TJF.red_id));
+  var b = tjBase();
+  $("tj-tagline").value = b.tagline || ""; $("tj-about").value = b.about || ""; $("tj-area").value = b.area || ""; $("tj-poblacion").value = b.poblacion || "";
+  $("tj-progs").innerHTML = "";
+  (b.programs && b.programs.length ? b.programs : [{ name: "", desc: "" }]).forEach(function(g){ tjAgregar(g); });
+}
+function tjAgregar(g){
+  var n = $("tj-progs").children.length;
+  if (n >= ((TJF && TJF.tope_programas) || 6)) { msg("m-tarjeta", "Caben hasta " + ((TJF && TJF.tope_programas) || 6) + " programas.", "mal"); return; }
+  var d = document.createElement("div");
+  d.className = "tj-prog";
+  d.innerHTML = '<label>Nombre del programa</label><input type="text" class="tj-pn" maxlength="80">' +
+    '<label>Qué hace y a quién llega</label><span class="ayuda">Una o dos frases. Si das una cifra, que la puedan comprobar.</span><textarea class="tj-pd" maxlength="700" rows="3"></textarea>' +
+    '<button type="button" class="btn sec mini mt" data-tj-quitar="1">Quitar este programa</button>';
+  d.querySelector(".tj-pn").value = (g && g.name) || "";
+  d.querySelector(".tj-pd").value = (g && g.desc) || "";
+  $("tj-progs").appendChild(d);
+}
+function tjEnviar(ev){
+  if (ev) ev.preventDefault();
+  var datos = { tagline: $("tj-tagline").value, about: $("tj-about").value, area: $("tj-area").value, poblacion: $("tj-poblacion").value,
+    programs: Array.prototype.map.call(document.querySelectorAll("#tj-progs .tj-prog"), function(x){
+      return { name: x.querySelector(".tj-pn").value, desc: x.querySelector(".tj-pd").value }; }) };
+  var b = $("b-tarjeta"); b.disabled = true; msg("m-tarjeta", "Enviando…");
+  enviar("/api/portal/tarjeta", { accion: "enviar", datos: datos }).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-tarjeta", r.d.ayuda || "No se pudo enviar.", "mal"); return; }
+    msg("m-tarjeta", "Enviada. El equipo la revisa y te avisamos cuando esté publicada.", "ok");
+    cargarTarjeta();
+  }).catch(function(){ b.disabled = false; msg("m-tarjeta", "No pudimos conectar. Tus cambios siguen en pantalla: intenta de nuevo.", "mal"); });
+}
+document.addEventListener("click", function(ev){
+  var q = ev.target && ev.target.closest ? ev.target.closest("[data-tj-quitar]") : null;
+  if (q) { var p = q.closest(".tj-prog"); if (p && $("tj-progs").children.length > 1) p.parentNode.removeChild(p); }
+});
+
 var DRS = null;
 var DR_CAT = { especie: "En especie", voluntariado: "Voluntariado", conocimiento: "Conocimiento o asesoría", espacio: "Espacios", otro: "Otro" };
 function cargarDar(){
@@ -36095,6 +36401,10 @@ textarea { font-size: 16px }
 .pn-caja{margin:0 0 22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px;background:var(--surface)}
 .pn-caja>summary{cursor:pointer;font-weight:700;font-size:var(--fs-14)}
 .ui-salida{margin:0 0 14px}
+.tj-fila{margin:0 0 18px;padding:0 0 4px;border-bottom:1px solid var(--bd)}
+.tj-fila .pn-h3{margin-top:14px}
+.tj-cambio{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;background:var(--amberl);color:var(--ink);font-size:var(--fs-12);letter-spacing:0;text-transform:none}
+.tj-hoy{margin:0 0 6px;font-size:var(--fs-13);color:var(--mu)}
 .ui-salida-t{margin:0 0 10px;font-weight:700;font-size:var(--fs-15)}
 .ui-salida-t small{display:block;font-weight:400;color:var(--mu);font-size:var(--fs-13);margin-top:2px}
 
@@ -36569,6 +36879,7 @@ textarea { font-size: 16px }
   <a class="pn-it" href="#alianzas/fundaciones" data-pn-ir="alianzas/fundaciones">Fundaciones</a>
   <a class="pn-it" href="#alianzas/dar" data-pn-ir="alianzas/dar">Dar y recibir<span class="pn-n" data-pn-n="alianzas/dar"></span></a>
   <a class="pn-it" href="#alianzas/costos" data-pn-ir="alianzas/costos">Costos de impacto</a>
+  <a class="pn-it" href="#alianzas/tarjetas" data-pn-ir="alianzas/tarjetas">Tarjetas del HUB</a>
   <a class="pn-it" href="#personas/contactos" data-pn-ir="personas/contactos">Contactos<span class="pn-n" data-pn-n="personas/contactos"></span></a>
   <a class="pn-it" href="#personas/voluntariado" data-pn-ir="personas/voluntariado">Voluntariado<span class="pn-n" data-pn-n="personas/voluntariado"></span></a>
   <a class="pn-it" href="#personas/ingenieros" data-pn-ir="personas/ingenieros">Ingenieros<span class="pn-n" data-pn-n="personas/ingenieros"></span></a>
@@ -36842,6 +37153,14 @@ textarea { font-size: 16px }
 <p>Lo que proponen las fundaciones en su portal. <strong>Al marcar una unidad verificada, sale en la calculadora y en la ficha de la fundación en un par de minutos</strong>, con lo que incluye. Ninguna cifra llega al sitio sin esa verificación.</p>
 </div></details>
 <div id="tb-costos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- TARJETAS DEL HUB (0069): lo que la fundación cambia de su ficha pública. -->
+<section class="pn-vista" data-vista="alianzas/tarjetas" id="sec-tarjetas" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada fundación puede cambiar desde su portal lo que el público ve en su ficha: la frase, quiénes son, dónde trabajan, a quién acompañan y sus programas. Lo escribe en español. Aquí se revisa que sea cierto y que no traiga datos personales, se escribe el inglés y <strong>al aprobar se publica sola en un par de minutos</strong>. Mientras una propuesta espera, el sitio sigue mostrando lo último aprobado.</p>
+</div></details>
+<div id="tb-tarjetas" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="alianzas/dar" id="sec-dar" hidden>
@@ -38356,7 +38675,8 @@ var COLA_ES = {
   mediciones_fundacion_por_revisar: "Mediciones de las fundaciones por revisar",
   intercambios_nuevos: "Dar y recibir: lo nuevo de las fundaciones",
   aportes_fundacion_por_confirmar: "Aportes entre fundaciones por confirmar",
-  unidades_impacto_por_revisar: "Costos de impacto por verificar"
+  unidades_impacto_por_revisar: "Costos de impacto por verificar",
+  tarjetas_por_revisar: "Tarjetas del HUB por revisar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -38448,7 +38768,9 @@ var VISTAS = {
   "alianzas/red": { area: "Atender", titulo: "Solicitudes a la red",
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
   "alianzas/costos": { area: "Acompañar la red", titulo: "Costos de impacto",
-    linea: "Lo que cuesta una unidad de lo que hace cada fundación, verificado, y el bloque para la calculadora." },
+    linea: "Lo que cuesta una unidad de lo que hace cada fundación. Al verificarla, sale en la calculadora." },
+  "alianzas/tarjetas": { area: "Acompañar la red", titulo: "Tarjetas del HUB",
+    linea: "Lo que cada fundación cambia de su ficha pública desde su portal. Al aprobar, con el inglés, se publica sola." },
   "alianzas/dar": { area: "Acompañar la red", titulo: "Dar y recibir",
     linea: "Lo que cada fundación ofrece y necesita, para cruzarla con otra o con una empresa. No se publica fuera de la red." },
   "alianzas/fundaciones": { area: "Acompañar la red", titulo: "Fundaciones",
@@ -38674,7 +38996,8 @@ var COLA_MOD = {
   mediciones_fundacion_por_revisar: "revisar",
   intercambios_nuevos: "alianzas/dar",
   aportes_fundacion_por_confirmar: "alianzas/dar",
-  unidades_impacto_por_revisar: "revisar"
+  unidades_impacto_por_revisar: "revisar",
+  tarjetas_por_revisar: "revisar"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -38683,7 +39006,7 @@ var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respues
   correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" ,
   tareas_pendientes: "vencidas", documentos_vencidos: "atencion", documentos_por_vencer: "atencion",
   meal_indicadores_pendientes: "pendientes", portal_por_revisar: "portal", unidades_por_revisar: "unidad",
-  reportes_unidad_por_revisar: "reporte", mediciones_fundacion_por_revisar: "medicion", unidades_impacto_por_revisar: "costo" };
+  reportes_unidad_por_revisar: "reporte", mediciones_fundacion_por_revisar: "medicion", unidades_impacto_por_revisar: "costo", tarjetas_por_revisar: "tarjeta" };
 var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
 
 /* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
@@ -46689,8 +47012,8 @@ document.addEventListener("change", function(e){
    cajón de su sección, con su casilla y su versión. */
 var REV = null, REV_FILTRO = "todo";
 var REV_TIPOS = [["todo", "Todo"], ["reporte", "Reportes"], ["unidad", "Unidades"], ["medicion", "Mediciones"],
-  ["portal", "Perfiles y documentos"], ["costo", "Costos de impacto"], ["acta", "Actas en borrador"]];
-var REV_TIPO_ES = { reporte: "Reporte mensual", unidad: "Unidad", medicion: "Medición", portal: "Portal", costo: "Costo de impacto", acta: "Acta" };
+  ["portal", "Perfiles y documentos"], ["costo", "Costos de impacto"], ["tarjeta", "Tarjetas del HUB"], ["acta", "Actas en borrador"]];
+var REV_TIPO_ES = { reporte: "Reporte mensual", unidad: "Unidad", medicion: "Medición", portal: "Portal", costo: "Costo de impacto", tarjeta: "Tarjeta del HUB", acta: "Acta" };
 function cargarRevisar(){
   return pedirJSON("/api/admin/revisar", "tb-revisar").then(function(d){ REV = d; pintarRevisar(); });
 }
@@ -46739,6 +47062,7 @@ document.addEventListener("click", function(e){
   else if (tipo === "medicion") cargarIndicadoresRed().then(function(){ abrirMedicionFundacion(id); });
   else if (tipo === "portal") abrirPortal(id);
   else if (tipo === "costo") cargarUnidadesImpacto().then(function(){ abrirUnidadImpacto(id); });
+  else if (tipo === "tarjeta") cargarTarjetas().then(function(){ abrirTarjeta(id); });
   else if (tipo === "acta") location.hash = "entregas";
 });
 
@@ -46938,6 +47262,95 @@ document.addEventListener("click", function(e){
   if (!e.target.closest) return;
   var a = e.target.closest("[data-ui-abrir]");
   if (a) abrirUnidadImpacto(a.getAttribute("data-ui-abrir"));
+});
+
+/* ---------------- TARJETAS DEL HUB (0069) ----------------
+   Lo que una fundación quiere cambiar en su ficha pública. Al aprobar, con el
+   inglés, se publica sola en un par de minutos. */
+var TJ = null;
+function cargarTarjetas(){
+  return pedirJSON("/api/admin/tarjetas", "tb-tarjetas").then(function(d){ TJ = d; pintarTarjetas(); });
+}
+function pintarTarjetas(){
+  var caja = document.getElementById("tb-tarjetas"); if (!caja || !TJ) return;
+  var L = TJ.tarjetas || [];
+  caja.innerHTML = L.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Fundación</th><th scope="col">Estado</th>' +
+    '<th scope="col">Enviada</th><th scope="col"></th></tr></thead><tbody>' +
+    L.map(function(t){
+      return "<tr><td><strong>" + esc(t.fundacion) + "</strong>" + (t.red_id ? "" : '<br><small class="mu">sin vínculo con la red</small>') + "</td>" +
+        "<td>" + esc((TJ.estados || {})[t.estado] || t.estado) + (t.motivo ? "<br><small>" + esc(t.motivo) + "</small>" : "") + "</td>" +
+        "<td>" + esc(t.enviada || "—") + "</td>" +
+        '<td><button type="button" class="copy" data-tj-abrir="' + t.inscripcion + '">Abrir</button></td></tr>';
+    }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Ninguna fundación ha cambiado su tarjeta todavía. Lo hacen en su portal, en «Tu tarjeta».</p>';
+}
+/* Un campo: lo que se ve hoy, lo que propone la fundación y su inglés. Si el
+   español no cambió, el inglés de hoy viene puesto; si cambió, va vacío. */
+function tjFila(id, etiqueta, hoy, nuevo, area){
+  hoy = hoy || { es: "", en: "" };
+  var igual = (hoy.es || "") === (nuevo || "");
+  var h = '<div class="tj-fila"><p class="pn-h3">' + esc(etiqueta) + (nuevo && !igual ? ' <span class="tj-cambio">cambió</span>' : "") + "</p>";
+  if (!nuevo) return h + '<p class="mu">' + (hoy.es ? "La fundación lo dejó vacío: deja de salir." : "Vacío.") + "</p></div>";
+  if (!igual && hoy.es) h += '<p class="tj-hoy"><small>Hoy se ve:</small> ' + esc(hoy.es) + "</p>";
+  h += '<div class="qj-msg">' + esc(nuevo) + "</div>";
+  return h + pnCampo("tj-en-" + id, "En inglés", igual ? (hoy.en || "") : "", { area: !!area, filas: area ? 4 : 2 }) + "</div>";
+}
+function abrirTarjeta(insc){
+  var t = ((TJ && TJ.tarjetas) || []).filter(function(x){ return String(x.inscripcion) === String(insc); })[0];
+  if (!t) return;
+  var p = t.propuesta || {}, a = t.actual || { programs: [] };
+  var pend = t.estado === "enviada";
+  var h = ficha([
+    ["Fundación", esc(t.fundacion) + (t.red_id ? '<small><a href="/#fundacion/' + esc(t.red_id) + '" target="_blank" rel="noopener">Ver su ficha hoy</a></small>' : "<small>sin vínculo con la red: se puede aprobar, pero no sale hasta vincularla</small>")],
+    ["Estado", esc((TJ.estados || {})[t.estado] || t.estado) + (t.revisada_por ? "<small>" + esc(t.revisada_por) + "</small>" : "")],
+    ["Enviada", esc(t.enviada || "—")]
+  ]);
+  if (!pend){
+    h += '<p class="mu">' + (t.estado === "devuelta" ? "Devuelta: espera que la fundación la vuelva a enviar." : "Ya está publicada. Si la fundación la cambia, vuelve a aparecer aquí.") + "</p>";
+    cajonAbrir({ ey: "Tarjeta del HUB", titulo: t.fundacion, cuerpo: h, pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>', ancho: true });
+    return;
+  }
+  h += '<p class="mu">Revisa que sea cierto y que no haya datos personales. Escribe el inglés de lo que cambió: el sitio es bilingüe.</p>';
+  h += tjFila("tagline", "Frase corta", a.tagline, p.tagline) + tjFila("about", "Quiénes son", a.about, p.about, true) +
+    tjFila("area", "Dónde trabajan", a.area, p.area) + tjFila("poblacion", "A quién acompañan", a.poblacion, p.poblacion);
+  (p.programs || []).forEach(function(g, i){
+    var hoy = (a.programs || []).filter(function(x){ return x.name === g.name; })[0];
+    h += tjFila("prog-" + i, "Programa: " + g.name, hoy ? hoy.desc : null, g.desc, true);
+  });
+  h += '<div class="pn-caja ui-salida"><p class="ui-salida-t">Si está bien<small>Se publica en la ficha de la fundación en un par de minutos.</small></p>' +
+    '<button type="button" class="pn-b1" data-tj-decidir="aprobar">Aprobar y publicar</button></div>' +
+    '<div class="pn-caja ui-salida"><p class="ui-salida-t">Si algo no cuadra<small>La fundación lo lee en su portal y puede corregir y volver a enviar.</small></p>' +
+    pnCampo("tj-mot", "Qué cambiar", "", { area: true, filas: 2 }) +
+    '<button type="button" class="pn-b2" data-tj-decidir="devolver">Devolver a la fundación</button></div><p class="pn-error" id="pn-err"></p>';
+  cajonAbrir({ ey: "Tarjeta del HUB", titulo: t.fundacion, cuerpo: h, pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>', ancho: true });
+  document.querySelectorAll("[data-tj-decidir]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var acc = b.getAttribute("data-tj-decidir");
+      var val = function(id){ return document.getElementById(id) ? pnValor(id) : ""; };
+      document.querySelectorAll("#pn-cajon .pn-campo").forEach(function(x){ if (x.id) pnMarcar(x.id.replace(/-c$/, ""), ""); });
+      var c = { accion: acc, ver: t.ver, motivo: val("tj-mot"),
+        en: { tagline: val("tj-en-tagline"), about: val("tj-en-about"), area: val("tj-en-area"), poblacion: val("tj-en-poblacion"),
+          programs: (p.programs || []).map(function(g, i){ return val("tj-en-prog-" + i); }) } };
+      if (acc === "aprobar"){
+        var falta = ["tagline", "about", "area", "poblacion"].filter(function(k){ return p[k] && c.en[k].length < 3; })[0];
+        if (falta){ pnMarcar("tj-en-" + falta, "Falta el inglés."); return; }
+        var fp = c.en.programs.map(function(v, i){ return v.length < 3 ? i : -1; }).filter(function(i){ return i > -1; })[0];
+        if (fp != null){ pnMarcar("tj-en-prog-" + fp, "Falta el inglés."); return; }
+      }
+      if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("tj-mot", "Di qué cambiar: la fundación lo ve."); return; }
+      b.disabled = true;
+      postPanel("/api/admin/tarjeta/" + t.inscripcion, c).then(function(r){
+        b.disabled = false; if (!r) return;
+        avisar(acc === "aprobar" ? (t.red_id ? "Aprobada. Sale en su ficha en un par de minutos." : "Aprobada. Saldrá cuando la fundación esté vinculada a la red.") : "Devuelta a la fundación.");
+        cajonCerrar(); cargarTarjetas(); cargarSalud();
+      });
+    });
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var a = e.target.closest("[data-tj-abrir]");
+  if (a) abrirTarjeta(a.getAttribute("data-tj-abrir"));
 });
 
 /* ---------------- EL BOLETÍN PARA DONANTES (0061) ----------------
@@ -47177,6 +47590,7 @@ var BANDEJAS = {
   "tb-dar": cargarIntercambios,
   "tb-apf": cargarAportesFund,
   "tb-costos": cargarUnidadesImpacto,
+  "tb-tarjetas": cargarTarjetas,
   "tb-boletin": cargarBoletin,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
@@ -51330,6 +51744,9 @@ export default {
         const aaf = ruta.match(/^\/api\/admin\/aporte-fundacion\/(\d{1,9})$/);
         if (aaf) return await adminAporteFundacion(request, env, Number(aaf[1]), sesion.email);
         if (ruta === "/api/admin/unidades-impacto") return await adminUnidadesImpacto(env);
+        if (ruta === "/api/admin/tarjetas")     return await adminTarjetas(env);
+        const atj = ruta.match(/^\/api\/admin\/tarjeta\/(\d{1,9})$/);
+        if (atj)                                return await adminTarjetaDecidir(request, env, Number(atj[1]), sesion.email);
         if (ruta === "/api/admin/boletin")      return await adminBoletin(request, env, sesion.email);
         const abo = ruta.match(/^\/api\/admin\/boletin\/(\d{1,9})\/(prueba|enviar)$/);
         if (abo) return abo[2] === "prueba" ? (request.method === "POST" ? await adminBoletinPrueba(env, Number(abo[1]), sesion.email) : json({ error: "metodo_no_permitido" }, 405))
@@ -51569,6 +51986,7 @@ export default {
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
         if (ruta === "/api/portal/indicadores") return await apiPortalIndicadores(request, env);
         if (ruta === "/api/portal/intercambios") return await apiPortalIntercambios(request, env);
+        if (ruta === "/api/portal/tarjeta")     return await apiPortalTarjeta(request, env);
         if (ruta === "/api/portal/unidades-impacto") return await apiPortalUnidadesImpacto(request, env);
         if (ruta === "/api/portal/recibido") return await apiPortalRecibido(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
