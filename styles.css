@@ -2232,6 +2232,10 @@ html[data-theme="dark"] .grat-card-more{color:var(--brote)}
 .fimp-u:hover{color:var(--ink)}
 .fimp-u.on{border-left-color:var(--acc);color:var(--ink)}
 .fimp-u:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.fimp-inc{margin:14px 0 4px;padding:12px 0 0;border-top:1px solid var(--bd)}
+.fimp-inc-t{display:block;font-size:var(--fs-13);font-weight:700;color:var(--ink);margin:0 0 4px}
+.fimp-inc p{margin:0;font-size:var(--fs-14);line-height:1.5;color:var(--ink-soft)}
+.fimp-inc .fimp-inc-v{margin-top:6px;font-size:var(--fs-13);color:var(--mu)}
 /* Filtros y resumen del mapa de red */
 .map-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
 .map-fchip{padding:8px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--surface);color:var(--ink-soft);font-size:var(--fs-14);font-weight:700;font-family:inherit;cursor:pointer}

@@ -858,6 +858,8 @@
   "ficha.imp.calc": "With {a} here you achieve approximately {x}.",
   "ficha.imp.min": "Pick an amount to see the equivalent impact.",
   "ficha.imp.prog": "Choose the programme",
+  "ficha.imp.incluye": "What each {u} includes",
+  "ficha.imp.verif": "Cost checked by Give&Grow against a supporting document from the foundation.",
   "ficha.hub.t": "How the Social Hub strengthens it",
   "ficha.web": "Visit website",
   "ficha.cta.t": "Give with this foundation as its destination.",
