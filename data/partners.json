@@ -542,6 +542,20 @@
             "es": "Laderas de la vereda Granizal, en Bello, donde no hay acueducto",
             "en": "Hillsides of Granizal, in Bello, where there is no water mains"
           }
+        },
+        {
+          "src": "/img/jornadas/entropika_filtro_familia.webp",
+          "alt": {
+            "es": "Una madre y sus hijas con el filtro de agua recién instalado en su casa",
+            "en": "A mother and her daughters with the water filter just installed in their home"
+          }
+        },
+        {
+          "src": "/img/jornadas/entropika_filtro_hogar.webp",
+          "alt": {
+            "es": "Una familia de Granizal junto al filtro instalado en la cocina",
+            "en": "A family in Granizal beside the filter installed in their kitchen"
+          }
         }
       ],
       "consent": {
@@ -550,7 +564,7 @@
         "photos": true,
         "minorsImageProtected": true,
         "date": "2026-11-18",
-        "source": "Sección 7 del cuestionario de la fundación, diligenciado el 18 nov 2026 por su Representante Legal Suplente: autoriza nombre, logo y las fotos que envíe o apruebe expresamente, y declara contar con autorización escrita de padres o acudientes de los menores que aparezcan. Se publican 3 de las 5 fotos enviadas, todas sin menores; las 2 con niñas y niños reconocibles quedan fuera. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada entropika\"."
+        "source": "Sección 7 del cuestionario de la fundación, diligenciado el 18 nov 2026 por su Representante Legal Suplente: autoriza nombre, logo y las fotos que envíe o apruebe expresamente, y declara contar con autorización escrita de padres o acudientes de los menores que aparezcan. Las 2 fotos con niñas, niños y un bebé reconocibles se publicaron después de que el Representante Legal Suplente confirmara en persona a Give&Grow, el 19 nov 2026, que tienen la autorización escrita de padres o acudientes. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada entropika\"."
       },
       "poblacion": {
         "es": "≈220 personas de forma regular y ≈2.800 con proyectos de impacto masivo, reportadas por la fundación",
