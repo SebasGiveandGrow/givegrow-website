@@ -1809,6 +1809,7 @@ var I18N = {
     "ficha.imp.t":"Tu aporte aquí, en concreto",
     "ficha.imp.calc":"Con {a} aquí logras aproximadamente {x}.",
     "ficha.imp.min":"Elige un monto para ver el impacto equivalente.",
+    "ficha.imp.prog":"Elige el programa",
     "ficha.hub.t":"Cómo la fortalece el HUB SOCIAL",
     "ficha.web":"Ver sitio web",
     "ficha.cta.t":"Dona con destino a esta fundación.",
@@ -3893,7 +3894,7 @@ var ACT_FNS = {
   sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit, asisSubmit:asisSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   almaIntroCerrar:almaIntroCerrar, almaPregunta:almaPregunta, almaIr:almaIr,
-  openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
+  openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, fichaImpUnidad:fichaImpUnidad, donarDesdeFicha:donarDesdeFicha, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
 };
 /* LAS ACCIONES QUE VIVEN EN UN ARCHIVO APARTE (código por ruta, 13 oct 2026).
@@ -4312,12 +4313,19 @@ function setProject(unitId){
 }
 /* CTA de la ficha: abre la calculadora con el proyecto de ESA fundación ya elegido,
    para que el donante no tenga que volver a buscarla en el selector. */
-function donarA(unitId){
+function donarA(unitId, cop){
   go("donar");
   loadPartners().then(function(){
     try { buildProjectSelect(); } catch(e){}
+    /* Con monto (viene de la ficha): aporte único por ese valor. */
+    if (cop > 0){
+      calc.val = cop;
+      var man = document.getElementById("calc-manual"); if (man) man.value = "";
+      syncSlider();
+      if (calc.freq !== "u") setFreq("u");
+    }
     var sel = document.getElementById("calc-project");
-    if (!sel || !unitId) return;
+    if (!sel || !unitId){ calcUpdate(); return; }
     sel.value = unitId;
     if (sel.value !== unitId) return;   // la unidad ya no existe: se queda en el fondo general
     setProject(unitId);
@@ -5305,16 +5313,18 @@ function renderFicha(fid){
       + '<span class="ey">'+t("ficha.aside.ey")+'</span>'
       + '<h2>'+(u ? t("ficha.imp.t") : t("ficha.cta.t"))+'</h2>';
     if (u){
-      /* Si la unidad más barata pasa de $100.000 (un filtro de agua), los
-         montos chicos no alcanzan ni para una: se ofrecen 1, 2 y 4 unidades. */
-      var minU = Math.min.apply(null, p.impactUnits.map(function(x){ return x.cop || Infinity; }));
-      var grande = minU > 100000 && isFinite(minU);
-      var qs = grande ? [minU, minU*2, minU*4] : [10000, 20000, 50000, 100000];
-      lat += '<div class="fimp-row">' + qs.map(function(q,qi){
-        return '<button type="button" class="fimp-q'+(qi===(grande?0:1)?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
-      }).join('') + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'"></p>';
+      /* Con varias unidades, se elige el programa primero: cada uno tiene
+         su costo y sus montos. «Donar ahora» lleva ese programa y ese monto
+         a la calculadora (19 nov 2026, pedido de Sebas). */
+      var us = p.impactUnits;
+      if (us.length > 1){
+        lat += '<p class="fimp-cap">'+t("ficha.imp.prog")+'</p><div class="fimp-units" role="group" aria-label="'+esc(t("ficha.imp.prog"))+'">' + us.map(function(x,xi){
+          return '<button type="button" class="fimp-u'+(xi===0?' on':'')+'" aria-pressed="'+(xi===0)+'" data-act="fichaImpUnidad(this,\''+esc(p.id)+'\','+xi+')">'+esc(x.project || x[lang] || x.es)+'</button>';
+        }).join('') + '</div>';
+      }
+      lat += '<div class="fimp-row" id="fimp-row">' + fimpMontos(p.id, u) + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'" data-ui="0"></p>';
     }
-    lat += '<a class="ficha-cta-btn" href="/donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
+    lat += '<a class="ficha-cta-btn" href="/donar"'+(u ? ' data-act="donarDesdeFicha(\''+esc(p.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
       + '<p class="ficha-apoyo-nota">'+t("ficha.cta.p")+'</p>' + tiraHtml() + '</div>';
 
     html += fichaCuerpo(main, lat, "");
@@ -6231,6 +6241,40 @@ function escapeHtml(text){
      el siguiente. */
   return String(text==null?"":text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+/* Los montos de la ficha según la unidad: si un monto chico no alcanza ni
+   para una (un filtro de $250.000, un mes de baile de $300.000), se ofrecen
+   1, 2 y 4 unidades; si no, los cuatro montos de siempre. */
+function fimpMontos(fid, u){
+  var grande = u && u.cop > 25000;
+  var qs = grande ? [u.cop, u.cop*2, u.cop*4] : [10000, 20000, 50000, 100000];
+  return qs.map(function(q,qi){
+    return '<button type="button" class="fimp-q'+(qi===(grande?0:1)?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+escapeHtml(fid)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
+  }).join('');
+}
+function fichaImpUnidad(btn, fid, ui){
+  var out = document.getElementById("fimp-out"), row = document.getElementById("fimp-row");
+  if (!out || !row) return;
+  document.querySelectorAll(".fimp-u").forEach(function(b){ var on = b===btn; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  out.setAttribute("data-ui", ui);
+  loadPartners().then(function(list){
+    var p=null; for (var i=0;i<list.length;i++){ if(list[i].id===fid){ p=list[i]; break; } }
+    if (!p || !p.impactUnits || !p.impactUnits[ui]) return;
+    row.innerHTML = fimpMontos(fid, p.impactUnits[ui]);
+    fichaImpCalc(row.querySelector(".fimp-q.on"), fid);
+  });
+}
+/* «Donar ahora» de la ficha: la calculadora abre con el programa y el monto
+   que la persona ya eligió aquí, como aporte único. */
+function donarDesdeFicha(fid){
+  var out = document.getElementById("fimp-out"), q = document.querySelector(".fimp-q.on");
+  var ui = out ? (parseInt(out.getAttribute("data-ui"),10) || 0) : 0;
+  var cop = q ? (parseInt(q.getAttribute("data-cop"),10) || 0) : 0;
+  loadPartners().then(function(list){
+    var p=null; for (var i=0;i<list.length;i++){ if(list[i].id===fid){ p=list[i]; break; } }
+    var u = p && p.impactUnits && p.impactUnits[ui];
+    donarA(u ? u.id : "", cop);
+  });
+}
 /* Mini-calculadora de impacto en la ficha de fundación (usa impactUnits reales) */
 function fichaImpCalc(btn, fid){
   var out = document.getElementById("fimp-out"); if (!out) return;
@@ -6239,8 +6283,9 @@ function fichaImpCalc(btn, fid){
   loadPartners().then(function(list){
     var p=null; for (var i=0;i<list.length;i++){ if(list[i].id===fid){ p=list[i]; break; } }
     if (!p || !p.impactUnits || !p.impactUnits.length){ out.textContent=""; return; }
-    var parts = [];
+    var parts = [], ui = parseInt(out.getAttribute("data-ui"),10) || 0;
     for (var k=0;k<p.impactUnits.length;k++){
+      if (k !== ui) continue;
       var u=p.impactUnits[k], n=Math.floor(cop/u.cop);
       if (n<1) continue;
       var label = (n===1) ? (u[lang]||u.es) : (u[lang+"Pl"]||u.esPl||u.es);

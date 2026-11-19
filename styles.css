@@ -2226,6 +2226,12 @@ html[data-theme="dark"] .grat-card-more{color:var(--brote)}
 .fimp-q.on{background:var(--g);border-color:var(--g);color:var(--on-dark)}
 #fimp-out{margin:4px 0 0;font-size:var(--fs-16);color:var(--ink-soft);line-height:1.5}
 #fimp-out b{color:var(--acc)}
+.fimp-cap{margin:16px 0 6px;font-size:var(--fs-13);font-weight:600;color:var(--mu)}
+.fimp-units{display:flex;flex-direction:column;border-top:1px solid var(--bd)}
+.fimp-u{display:block;width:100%;text-align:left;padding:10px 8px 10px 12px;border:0;border-bottom:1px solid var(--bd);border-left:3px solid transparent;background:none;color:var(--ink-soft);font:inherit;font-size:var(--fs-15);font-weight:600;line-height:1.35;cursor:pointer}
+.fimp-u:hover{color:var(--ink)}
+.fimp-u.on{border-left-color:var(--acc);color:var(--ink)}
+.fimp-u:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 /* Filtros y resumen del mapa de red */
 .map-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
 .map-fchip{padding:8px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--surface);color:var(--ink-soft);font-size:var(--fs-14);font-weight:700;font-family:inherit;cursor:pointer}
