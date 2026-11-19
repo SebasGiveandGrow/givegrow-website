@@ -35949,6 +35949,9 @@ textarea { font-size: 16px }
 .pn-cajon-pie .pn-pie-nota{flex:1 1 100%;margin:0;font-size:var(--fs-12);color:var(--mu)}
 .pn-campo{display:block;margin:0 0 14px}
 .pn-campo>span{display:block;font-size:var(--fs-13);font-weight:600;color:var(--ink);margin:0 0 4px}
+/* La casilla va al lado de su texto, no encima. */
+.pn-campo>span:has(>input[type=checkbox]){display:flex;align-items:center;gap:8px;font-size:var(--fs-14)}
+.pn-campo>span>input[type=checkbox]{display:inline-block;width:18px;height:18px;margin:0;flex:0 0 auto}
 .pn-campo input:not([type=checkbox]),.pn-campo select,.pn-campo textarea{display:block;width:100%;padding:9px 11px;border:1px solid var(--bd);
   border-radius:8px;font:inherit;font-size:var(--fs-16);background:var(--bg);color:var(--ink)}
 .pn-campo textarea{resize:vertical;min-height:90px}
@@ -36020,6 +36023,9 @@ textarea { font-size: 16px }
 .eg-cuentas b{color:var(--ink);font-variant-numeric:tabular-nums}
 .pn-caja{margin:0 0 22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px;background:var(--surface)}
 .pn-caja>summary{cursor:pointer;font-weight:700;font-size:var(--fs-14)}
+.ui-salida{margin:0 0 14px}
+.ui-salida-t{margin:0 0 10px;font-weight:700;font-size:var(--fs-15)}
+.ui-salida-t small{display:block;font-weight:400;color:var(--mu);font-size:var(--fs-13);margin-top:2px}
 
 /* El buscador: resultados en reglas finas. */
 .bus-fila{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:baseline;padding:10px 0;border-top:1px solid var(--bd)}
@@ -46811,23 +46817,31 @@ function abrirUnidadImpacto(id){
     ["Programa", u.proyecto ? esc(u.proyecto) : '<span class="mu">—</span>'],
     ["Costo de una unidad", dinero(u.costo_cop * 100, "COP")],
     ["Qué incluye", u.incluye ? '<div class="qj-msg">' + esc(u.incluye) + "</div>" : '<span class="mu">No lo dijo</span>'],
-    ["Soporte del costo", u.soporte_doc ? '<a href="/api/admin/portal-doc/' + u.soporte_doc + '">' + esc(u.soporte_tipo || "documento") + (u.soporte_nota ? " · " + esc(u.soporte_nota) : "") + "</a>" : '<span class="mu">Sin soporte</span>'],
+    ["Soporte del costo", u.soporte_doc ? '<a href="/api/admin/portal-doc/' + u.soporte_doc + '" target="_blank" rel="noopener">Abrir el soporte</a>' + (u.soporte_nota ? "<small>" + esc(u.soporte_nota) + "</small>" : "") : '<span class="mu">Sin soporte: devuélvela y pídelo</span>'],
     ["Estado", esc((UI.estados || {})[u.estado] || u.estado) + (u.revisado_por ? "<small>" + esc(u.revisado_por) + "</small>" : "")]
   ]);
-  h += pnCampo("ui-en", "En inglés, singular (la calculadora es bilingüe)", u.nombre_en || "", { extra: ' maxlength="80"' }) +
-    pnCampo("ui-enpl", "En inglés, plural", u.nombre_en_pl || "", { extra: ' maxlength="90"' }) +
-    '<label class="pn-campo" id="ui-ver-c"><span><input type="checkbox" id="ui-ver"> Verifiqué el costo contra su soporte</span><small id="ui-ver-e" class="pn-err"></small></label>' +
-    pnCampo("ui-mot", "Motivo para devolverla (la fundación lo ve)", "", { area: true, filas: 2 }) + '<p class="pn-error" id="pn-err"></p>';
-  var pie = '<button type="button" class="pn-b1" data-ui-decidir="aprobar">' + (u.estado === "aprobada" ? "Guardar y mantener verificada" : "Marcar verificada") + "</button>" +
-    '<button type="button" class="pn-b2" data-ui-decidir="devolver">Devolver</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  var verif = u.estado === "aprobada";
+  h += '<p class="pn-h3">Tu revisión</p>' +
+    '<p class="mu">Abre el soporte y compara el costo de una unidad con lo que dice el documento. Después elige una de las dos salidas.</p>' +
+    '<div class="pn-caja ui-salida"><p class="ui-salida-t">Si el costo cuadra<small>Marca la casilla y escribe cómo se dice la unidad en inglés: es lo que lee quien usa la calculadora en inglés.</small></p>' +
+    '<label class="pn-campo" id="ui-ver-c"><span><input type="checkbox" id="ui-ver"' + (verif ? " checked" : "") + '> Verifiqué el costo contra su soporte</span><small id="ui-ver-e" class="pn-err"></small></label>' +
+    pnCampo("ui-en", "Nombre en inglés, singular", u.nombre_en || "", { extra: ' maxlength="80" placeholder="' + esc("Ej.: " + "school kit") + '"' }) +
+    pnCampo("ui-enpl", "Nombre en inglés, plural", u.nombre_en_pl || "", { extra: ' maxlength="90" placeholder="' + esc("Ej.: " + "school kits") + '"' }) +
+    '<button type="button" class="pn-b1" data-ui-decidir="aprobar">' + (verif ? "Guardar y mantener verificada" : "Marcar verificada") + "</button></div>" +
+    '<div class="pn-caja ui-salida"><p class="ui-salida-t">Si algo no cuadra<small>Escribe qué falta o qué hay que corregir. La fundación lo lee en su portal y puede volver a enviarla.</small></p>' +
+    pnCampo("ui-mot", "Qué falta", "", { area: true, filas: 2 }) +
+    '<button type="button" class="pn-b2" data-ui-decidir="devolver">Devolver a la fundación</button></div>' +
+    '<p class="pn-error" id="pn-err"></p>';
+  var pie = '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
   cajonAbrir({ ey: "Costo de impacto", titulo: u.nombre_es, cuerpo: h, pie: pie, ancho: true });
   document.querySelectorAll("[data-ui-decidir]").forEach(function(b){
     b.addEventListener("click", function(){
       var acc = b.getAttribute("data-ui-decidir");
-      ["ui-en", "ui-ver", "ui-mot"].forEach(function(k){ pnMarcar(k, ""); });
+      ["ui-en", "ui-enpl", "ui-ver", "ui-mot"].forEach(function(k){ pnMarcar(k, ""); });
       var c = { accion: acc, ver: u.ver, costo_verificado: document.getElementById("ui-ver").checked, nombre_en: pnValor("ui-en"), nombre_en_pl: pnValor("ui-enpl"), motivo: pnValor("ui-mot") };
       if (acc === "aprobar" && !c.costo_verificado){ pnMarcar("ui-ver", "Verifica el costo antes."); return; }
-      if (acc === "aprobar" && (c.nombre_en.length < 3 || c.nombre_en_pl.length < 3)){ pnMarcar("ui-en", "Falta el inglés, en singular y en plural."); return; }
+      if (acc === "aprobar" && c.nombre_en.length < 3){ pnMarcar("ui-en", "Escribe el nombre en inglés, en singular."); return; }
+      if (acc === "aprobar" && c.nombre_en_pl.length < 3){ pnMarcar("ui-enpl", "Escribe el nombre en inglés, en plural."); return; }
       if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("ui-mot", "Di qué falta: la fundación lo ve."); return; }
       b.disabled = true;
       postPanel("/api/admin/unidad-impacto/" + u.id, c).then(function(r){
