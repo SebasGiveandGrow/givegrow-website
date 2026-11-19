@@ -47,6 +47,7 @@ const BATERIAS = [
   { nombre: "entregas", archivo: "ops/probar-entregas.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
   { nombre: "regalos-aliada", archivo: "ops/probar-regalos-aliada.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
   { nombre: "aportes-fundacion", archivo: "ops/probar-aportes-fundacion.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
+  { nombre: "unidades-vivo", archivo: "ops/probar-unidades-vivo.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
 ];
 
 const filtro = process.argv[2] || "";

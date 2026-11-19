@@ -16743,9 +16743,8 @@ Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. C
    Una fundación que retiró el consentimiento del nombre no entra. */
 async function almaContextoRed(env, origen) {
   try {
-    const r = await env.ASSETS.fetch(new URL("/data/partners.json", origen));
-    if (!r.ok) return "";
-    const data = await r.json();
+    const data = await redPublica(env, origen);
+    if (!data) return "";
     const partners = Array.isArray(data && data.partners) ? data.partners : [];
     const lineas = [];
     for (const p of partners) {
@@ -23017,15 +23016,76 @@ async function adminIntercambioNota(request, env, id, quien) {
    ============================================================================
    La fundación propone en su portal cuánto cuesta una unidad de lo que hace
    («plato de comida: $4.000»), con el soporte. El equipo la verifica en la
-   Bandeja de revisión, escribe el inglés, y el panel arma el bloque
-   `impactUnits` para pegar en data/partners.json, que sigue siendo LA FUENTE
-   de la calculadora pública. Nada de esta tabla llega solo al sitio. */
+   Bandeja de revisión y escribe el inglés. Desde el 19 nov 2026 (0068,
+   decisión de Sebas) verificarla la PUBLICA: el Worker la mezcla sobre
+   data/partners.json en `redPublica`. Nada sale sin esa verificación: una
+   unidad que la fundación edita vuelve a «por revisar» y deja de salir. */
 const UIMP_TOPE = 12;
 const UIMP_ESTADO_ES = { propuesta: "Por revisar", aprobada: "Verificada", devuelta: "Devuelta", retirada: "Retirada" };
 
 function slugImpacto(s) {
   return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
+
+/* El id con que una unidad verificada sale en la calculadora. Si el equipo la
+   enlazó a una que ya estaba en partners.json, lleva ESE id: las membresías y
+   las actas de entrega guardan el id como destino, y cambiarlo los dejaría
+   huérfanos. Si es nueva, se arma con el id de la fundación y el nombre. */
+function unidadRedId(f) {
+  return f.unidad_red ? String(f.unidad_red) : String(f.red_id || "").toLowerCase() + "-" + slugImpacto(f.nombre_es);
+}
+
+/* LA RED PÚBLICA = partners.json + lo verificado en /admin (0068, 19 nov 2026).
+   Decisión de Sebas: su clic en «Marcar verificada» publica la unidad, sin PR.
+   Todo lo que lee la red para el público pasa por aquí —/data/partners.json,
+   los destinos de las membresías, ALMA y la página para compartir—, así que el
+   sitio y el servidor nunca ven dos listas distintas.
+   Se guarda un minuto en el isolate; al verificar o devolver una unidad se
+   olvida en el isolate que atendió el clic, y los demás se ponen al día solos.
+   Quien la recibe NO la modifica: es el mismo objeto para todas las llamadas. */
+const REDPUB_TTL_MS = 60000;
+let REDPUB_CACHE = null;
+async function redPublica(env, origen) {
+  if (REDPUB_CACHE && Date.now() - REDPUB_CACHE.en < REDPUB_TTL_MS) return REDPUB_CACHE.data;
+  let data;
+  try {
+    const r = env.ASSETS ? await env.ASSETS.fetch(new URL("/data/partners.json", origen || ORIGIN)) : null;
+    if (!r || !r.ok) return null;
+    data = await r.json();
+  } catch (e) { console.error("red pública: archivo", e && e.message); return null; }
+  try { await mezclarUnidadesVerificadas(env, data); }
+  catch (e) { console.error("red pública: unidades verificadas", e && e.message); }
+  REDPUB_CACHE = { en: Date.now(), data };
+  return data;
+}
+function redPublicaOlvidar() { REDPUB_CACHE = null; DESTINOS_MB_CACHE = null; }
+
+async function mezclarUnidadesVerificadas(env, data) {
+  if (!env.DB) return;
+  const filas = (await env.DB.prepare(
+    "SELECT u.proyecto, u.nombre_es, u.nombre_es_pl, u.nombre_en, u.nombre_en_pl, u.costo_cop, u.incluye, u.incluye_en, u.unidad_red, i.red_id " +
+    "FROM unidades_impacto u JOIN inscripciones i ON i.id = u.inscripcion " +
+    "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL AND u.nombre_en IS NOT NULL ORDER BY u.revisado_en, u.id"
+  ).all()).results || [];
+  if (!filas.length) return;
+  const porId = new Map();
+  for (const p of (Array.isArray(data && data.partners) ? data.partners : [])) {
+    if (p && p.type === "foundation" && typeof p.id === "string") porId.set(p.id.toLowerCase(), p);
+  }
+  for (const f of filas) {
+    const p = porId.get(String(f.red_id).toLowerCase());
+    /* Sin la autorización del nombre no hay perfil, y sin perfil no hay unidad. */
+    if (!p || !(p.consent && p.consent.name === true)) continue;
+    const id = unidadRedId(f);
+    if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(id)) continue;
+    const u = { id, cop: f.costo_cop, es: f.nombre_es, esPl: f.nombre_es_pl, en: f.nombre_en, enPl: f.nombre_en_pl || f.nombre_en, verificada: true };
+    if (f.proyecto) u.project = f.proyecto;
+    if (f.incluye && f.incluye_en) u.incluye = { es: f.incluye, en: f.incluye_en };
+    const lista = Array.isArray(p.impactUnits) ? p.impactUnits : (p.impactUnits = []);
+    const k = lista.findIndex((x) => x && x.id === id);
+    if (k > -1) lista[k] = Object.assign({}, lista[k], u); else lista.push(u);
+  }
 }
 
 function unidadImpactoValida(c) {
@@ -23070,6 +23130,7 @@ async function apiPortalUnidadesImpacto(request, env) {
       "UPDATE unidades_impacto SET estado = 'retirada', actualizada = datetime('now') WHERE id = ? AND inscripcion = ? AND estado <> 'retirada'"
     ).bind(Number(c.id) || 0, s.inscripcion).run();
     if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    redPublicaOlvidar();
     return json({ ok: true });
   }
   if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
@@ -23085,6 +23146,7 @@ async function apiPortalUnidadesImpacto(request, env) {
       "estado = 'propuesta', motivo = NULL, actualizada = datetime('now') WHERE id = ? AND inscripcion = ? AND estado <> 'retirada'"
     ).bind(u.proyecto, u.nombre_es, u.nombre_es_pl, u.costo_cop, u.incluye, u.soporte_doc, Number(c.id) || 0, s.inscripcion).run();
     if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    redPublicaOlvidar();
     return json({ ok: true, id: Number(c.id) });
   }
   const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM unidades_impacto WHERE inscripcion = ? AND estado <> 'retirada'").bind(s.inscripcion).first();
@@ -23104,19 +23166,19 @@ async function adminUnidadesImpacto(env) {
     "JOIN inscripciones i ON i.id = u.inscripcion LEFT JOIN documentos_fundacion d ON d.id = u.soporte_doc " +
     "WHERE u.estado <> 'retirada' ORDER BY i.nombre, CASE u.estado WHEN 'propuesta' THEN 0 WHEN 'aprobada' THEN 1 ELSE 2 END, u.creada"
   ).all()).results || [];
-  /* El bloque `impactUnits`, con la misma forma que ya usa partners.json. */
-  const bloques = {};
-  for (const u of filas) {
-    if (u.estado !== "aprobada" || !u.red_id) continue;
-    const k = String(u.red_id);
-    (bloques[k] = bloques[k] || { red_id: k, fundacion: u.fundacion, unidades: [] }).unidades.push({
-      id: k + "-" + slugImpacto(u.nombre_es), cop: u.costo_cop, project: u.proyecto || "",
-      es: u.nombre_es, esPl: u.nombre_es_pl, en: u.nombre_en || "", enPl: u.nombre_en_pl || ""
-    });
-  }
-  return json({ ok: true, estados: UIMP_ESTADO_ES,
-    unidades: filas.map((u) => Object.assign(u, { ver: u.actualizada, actualizada: selloCO(u.actualizada).slice(0, 16) })),
-    bloques: Object.values(bloques).map((b) => Object.assign(b, { json: '"impactUnits": ' + JSON.stringify(b.unidades, null, 2) })) });
+  /* Las unidades que YA estaban en partners.json, por fundación: al verificar
+     se elige si la nueva reemplaza a una de ellas (y hereda su id) o es nueva. */
+  const archivo = {};
+  try {
+    const r = env.ASSETS ? await env.ASSETS.fetch(new URL("/data/partners.json", ORIGIN)) : null;
+    const d = r && r.ok ? await r.json() : null;
+    for (const p of (d && Array.isArray(d.partners) ? d.partners : [])) {
+      if (!p || p.type !== "foundation" || !Array.isArray(p.impactUnits)) continue;
+      archivo[String(p.id).toLowerCase()] = p.impactUnits.filter((u) => u && u.id).map((u) => ({ id: u.id, es: u.es, project: u.project || "", cop: u.cop }));
+    }
+  } catch (e) { console.error("unidades del archivo", e && e.message); }
+  return json({ ok: true, estados: UIMP_ESTADO_ES, archivo,
+    unidades: filas.map((u) => Object.assign(u, { ver: u.actualizada, actualizada: selloCO(u.actualizada).slice(0, 16), sale_como: u.red_id ? unidadRedId(u) : null })) });
 }
 
 /* POST /api/admin/unidad-impacto/<id> { accion: aprobar | devolver, ver } */
@@ -23133,10 +23195,18 @@ async function adminUnidadImpactoDecidir(request, env, id, quien) {
     if (c.costo_verificado !== true) return json({ error: "costo_sin_verificar", campo: "verificado", ayuda: "Marca que verificaste el costo contra su soporte." }, 400);
     const en = limpiar(c.nombre_en, 80), enPl = limpiar(c.nombre_en_pl, 90);
     if (en.length < 3 || enPl.length < 3) return json({ error: "dato_invalido", campo: "nombre_en", ayuda: "Falta el inglés, en singular y en plural: la calculadora es bilingüe." }, 400);
+    /* «Qué incluye» sale al público (0068): si la fundación lo escribió, va
+       también en inglés. Y el id: el de una unidad que ya estaba en el archivo,
+       o ninguno (unidad nueva). */
+    const fila = await env.DB.prepare("SELECT incluye FROM unidades_impacto WHERE id = ?").bind(id).first();
+    const incEn = String(c.incluye_en == null ? "" : c.incluye_en).replace(/\r\n?/g, "\n").trim().slice(0, 450);
+    if (fila && fila.incluye && incEn.length < 3) return json({ error: "dato_invalido", campo: "incluye_en", ayuda: "Escribe en inglés qué incluye: sale en la ficha de la fundación." }, 400);
+    const red = String(c.unidad_red == null ? "" : c.unidad_red).trim().toLowerCase();
+    if (red && !/^[a-z0-9][a-z0-9-]{1,59}$/.test(red)) return json({ error: "dato_invalido", campo: "unidad_red", ayuda: "Ese id de unidad no es válido." }, 400);
     r = await env.DB.prepare(
-      "UPDATE unidades_impacto SET estado = 'aprobada', nombre_en = ?, nombre_en_pl = ?, motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, " +
+      "UPDATE unidades_impacto SET estado = 'aprobada', nombre_en = ?, nombre_en_pl = ?, incluye_en = ?, unidad_red = ?, motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, " +
       "actualizada = datetime('now') WHERE id = ? AND actualizada = ? AND estado <> 'retirada'"
-    ).bind(en, enPl, quien || null, id, String(c.ver || "")).run();
+    ).bind(en, enPl, incEn || null, red || null, quien || null, id, String(c.ver || "")).run();
     detalle = "verificada";
   } else if (c.accion === "devolver") {
     const motivo = limpiar(c.motivo, 500);
@@ -23148,6 +23218,7 @@ async function adminUnidadImpactoDecidir(request, env, id, quien) {
     detalle = "devuelta";
   } else return json({ error: "accion_invalida" }, 400);
   if (!r.meta || !r.meta.changes) return cambio();
+  redPublicaOlvidar();
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "unidad de impacto " + id + " · " + detalle).run();
   return json({ ok: true });
@@ -36768,7 +36839,7 @@ textarea { font-size: 16px }
 <section class="pn-vista" data-vista="alianzas/costos" id="sec-costos" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>Cada fundación propone en su portal cuánto cuesta una unidad de lo que hace —un plato de comida, un mes de clases—, con el soporte. Se verifica en la <strong>Bandeja de revisión</strong>: el costo contra el soporte, y el inglés, porque la calculadora es bilingüe.</p>
-<p>La calculadora pública <strong>solo lee data/partners.json</strong>. Abajo está el bloque «impactUnits» de cada fundación con unidades verificadas: se copia, se pega en su objeto de partners.json y entra con un PR. Ninguna cifra llega al sitio sin ese paso.</p>
+<p>Lo que proponen las fundaciones en su portal. <strong>Al marcar una unidad verificada, sale en la calculadora y en la ficha de la fundación en un par de minutos</strong>, con lo que incluye. Ninguna cifra llega al sitio sin esa verificación.</p>
 </div></details>
 <div id="tb-costos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
@@ -46788,31 +46859,38 @@ function cargarUnidadesImpacto(){
 }
 function pintarUnidadesImpacto(){
   var caja = document.getElementById("tb-costos"); if (!caja || !UI) return;
-  var L = UI.unidades || [], B = UI.bloques || [];
+  var L = UI.unidades || [];
   var h = L.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Unidad</th><th scope="col">Fundación</th><th scope="col">Costo</th>' +
     '<th scope="col">Estado</th><th scope="col"></th></tr></thead><tbody>' +
     L.map(function(u){
       return "<tr><td><strong>" + esc(u.nombre_es) + "</strong><br><small>" + esc(u.nombre_es_pl) + (u.proyecto ? " · " + esc(u.proyecto) : "") + "</small></td>" +
         "<td>" + esc(u.fundacion) + (u.red_id ? "" : '<br><small class="mu">sin vínculo con partners.json</small>') + "</td>" +
         "<td>" + dinero(u.costo_cop * 100, "COP") + "</td>" +
-        "<td>" + esc((UI.estados || {})[u.estado] || u.estado) + (u.motivo ? "<br><small>" + esc(u.motivo) + "</small>" : "") + "</td>" +
+        "<td>" + esc((UI.estados || {})[u.estado] || u.estado) + (u.motivo ? "<br><small>" + esc(u.motivo) + "</small>" : "") +
+        (u.estado === "aprobada" && u.red_id ? '<br><small class="mu">En la calculadora como ' + esc(u.sale_como || "") + "</small>" : "") + "</td>" +
         '<td><button type="button" class="copy" data-ui-abrir="' + u.id + '">Abrir</button></td></tr>';
     }).join("") + "</tbody></table></div>"
     : '<p class="mu">Ninguna fundación ha propuesto costos todavía. Lo hacen en su portal, en Perfil › Unidad de impacto y costos.</p>';
-  h += '<p class="pn-h3">Para pegar en data/partners.json</p>' +
-    '<p class="mu">Solo las unidades verificadas de fundaciones con vínculo con la red. Reemplaza el campo «impactUnits» de esa fundación y sube el cambio con un PR: así llega a la calculadora.</p>';
-  h += B.length ? B.map(function(b, i){
-    return '<div class="ui-bloque"><p><strong>' + esc(b.fundacion) + "</strong> <small>(" + esc(b.red_id) + ")</small> · " + b.unidades.length +
-      (b.unidades.length === 1 ? " unidad" : " unidades") + ' <button type="button" class="pn-b2" data-ui-copiar="' + i + '">Copiar el bloque</button></p>' +
-      '<textarea readonly rows="8" id="ui-json-' + i + '" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">' + esc(b.json) + "</textarea></div>";
-  }).join("") : '<p class="mu">Todavía no hay unidades verificadas.</p>';
   caja.innerHTML = h;
+}
+/* Si la fundación ya tenía unidades en partners.json, la verificada puede
+   reemplazar a una (y heredar su id, que las membresías guardan como destino)
+   o ser nueva. Se preselecciona la del mismo costo o, si no, la guardada. */
+function uiSelectRed(u){
+  var arch = (UI && UI.archivo && u.red_id) ? (UI.archivo[String(u.red_id).toLowerCase()] || []) : [];
+  if (!arch.length) return "";
+  var elegida = u.unidad_red || "";
+  if (!elegida) arch.forEach(function(a){ if (!elegida && a.cop === u.costo_cop) elegida = a.id; });
+  return '<label class="pn-campo" id="ui-red-c"><span>En la calculadora, esta unidad…</span><select id="ui-red">' +
+    '<option value="">Es nueva: se suma a las que ya tiene</option>' +
+    arch.map(function(a){ return '<option value="' + esc(a.id) + '"' + (a.id === elegida ? " selected" : "") + ">Reemplaza a «" + esc(a.project || a.es) + "» (" + dinero(a.cop * 100, "COP") + ")</option>"; }).join("") +
+    '</select><small>Reemplazarla conserva su id, que las membresías y las actas guardan como destino.</small><small id="ui-red-e" class="pn-err"></small></label>';
 }
 function abrirUnidadImpacto(id){
   var u = ((UI && UI.unidades) || []).filter(function(x){ return String(x.id) === String(id); })[0];
   if (!u) return;
   var h = ficha([
-    ["Fundación", esc(u.fundacion) + (u.red_id ? "<small>en la red: " + esc(u.red_id) + "</small>" : "<small>sin vínculo con partners.json: se verifica, pero no entra al bloque hasta vincularla</small>")],
+    ["Fundación", esc(u.fundacion) + (u.red_id ? "<small>en la red: " + esc(u.red_id) + "</small>" : "<small>sin vínculo con la red: se puede verificar, pero no sale en el sitio hasta vincularla</small>")],
     ["Unidad", esc(u.nombre_es) + "<small>plural: " + esc(u.nombre_es_pl) + "</small>"],
     ["Programa", u.proyecto ? esc(u.proyecto) : '<span class="mu">—</span>'],
     ["Costo de una unidad", dinero(u.costo_cop * 100, "COP")],
@@ -46827,6 +46905,8 @@ function abrirUnidadImpacto(id){
     '<label class="pn-campo" id="ui-ver-c"><span><input type="checkbox" id="ui-ver"' + (verif ? " checked" : "") + '> Verifiqué el costo contra su soporte</span><small id="ui-ver-e" class="pn-err"></small></label>' +
     pnCampo("ui-en", "Nombre en inglés, singular", u.nombre_en || "", { extra: ' maxlength="80" placeholder="' + esc("Ej.: " + "school kit") + '"' }) +
     pnCampo("ui-enpl", "Nombre en inglés, plural", u.nombre_en_pl || "", { extra: ' maxlength="90" placeholder="' + esc("Ej.: " + "school kits") + '"' }) +
+    (u.incluye ? pnCampo("ui-incen", "Qué incluye, en inglés", u.incluye_en || "", { area: true, filas: 3, ayuda: "Sale en la ficha de la fundación, debajo de la calculadora." }) : "") +
+    uiSelectRed(u) +
     '<button type="button" class="pn-b1" data-ui-decidir="aprobar">' + (verif ? "Guardar y mantener verificada" : "Marcar verificada") + "</button></div>" +
     '<div class="pn-caja ui-salida"><p class="ui-salida-t">Si algo no cuadra<small>Escribe qué falta o qué hay que corregir. La fundación lo lee en su portal y puede volver a enviarla.</small></p>' +
     pnCampo("ui-mot", "Qué falta", "", { area: true, filas: 2 }) +
@@ -46837,16 +46917,18 @@ function abrirUnidadImpacto(id){
   document.querySelectorAll("[data-ui-decidir]").forEach(function(b){
     b.addEventListener("click", function(){
       var acc = b.getAttribute("data-ui-decidir");
-      ["ui-en", "ui-enpl", "ui-ver", "ui-mot"].forEach(function(k){ pnMarcar(k, ""); });
-      var c = { accion: acc, ver: u.ver, costo_verificado: document.getElementById("ui-ver").checked, nombre_en: pnValor("ui-en"), nombre_en_pl: pnValor("ui-enpl"), motivo: pnValor("ui-mot") };
+      ["ui-en", "ui-enpl", "ui-incen", "ui-ver", "ui-mot"].forEach(function(k){ pnMarcar(k, ""); });
+      var c = { accion: acc, ver: u.ver, costo_verificado: document.getElementById("ui-ver").checked, nombre_en: pnValor("ui-en"), nombre_en_pl: pnValor("ui-enpl"), motivo: pnValor("ui-mot"),
+        incluye_en: document.getElementById("ui-incen") ? pnValor("ui-incen") : "", unidad_red: document.getElementById("ui-red") ? document.getElementById("ui-red").value : "" };
       if (acc === "aprobar" && !c.costo_verificado){ pnMarcar("ui-ver", "Verifica el costo antes."); return; }
       if (acc === "aprobar" && c.nombre_en.length < 3){ pnMarcar("ui-en", "Escribe el nombre en inglés, en singular."); return; }
       if (acc === "aprobar" && c.nombre_en_pl.length < 3){ pnMarcar("ui-enpl", "Escribe el nombre en inglés, en plural."); return; }
+      if (acc === "aprobar" && u.incluye && c.incluye_en.length < 3){ pnMarcar("ui-incen", "Escribe en inglés qué incluye: sale en la ficha."); return; }
       if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("ui-mot", "Di qué falta: la fundación lo ve."); return; }
       b.disabled = true;
       postPanel("/api/admin/unidad-impacto/" + u.id, c).then(function(r){
         b.disabled = false; if (!r) return;
-        avisar(acc === "aprobar" ? "Verificada. Su bloque para partners.json está en Acompañar la red › Costos de impacto." : "Devuelta a la fundación.");
+        avisar(acc === "aprobar" ? (u.red_id ? "Verificada. Sale en la calculadora en un par de minutos." : "Verificada. Saldrá en el sitio cuando la fundación esté vinculada a la red.") : "Devuelta a la fundación.");
         cajonCerrar(); cargarUnidadesImpacto(); cargarSalud();
       });
     });
@@ -46855,15 +46937,7 @@ function abrirUnidadImpacto(id){
 document.addEventListener("click", function(e){
   if (!e.target.closest) return;
   var a = e.target.closest("[data-ui-abrir]");
-  if (a) { abrirUnidadImpacto(a.getAttribute("data-ui-abrir")); return; }
-  var c = e.target.closest("[data-ui-copiar]");
-  if (!c) return;
-  var t = document.getElementById("ui-json-" + c.getAttribute("data-ui-copiar"));
-  if (!t) return;
-  t.select();
-  var listo = function(){ avisar("Bloque copiado. Pégalo en data/partners.json, en el «impactUnits» de esa fundación."); };
-  if (navigator.clipboard) navigator.clipboard.writeText(t.value).then(listo, function(){ document.execCommand("copy"); listo(); });
-  else { document.execCommand("copy"); listo(); }
+  if (a) abrirUnidadImpacto(a.getAttribute("data-ui-abrir"));
 });
 
 /* ---------------- EL BOLETÍN PARA DONANTES (0061) ----------------
@@ -48108,7 +48182,7 @@ const DESTINO_MMC_MEMBRESIA = Object.freeze({
   id: "miramicasa-reparacion", destino_id: "miramicasa-reparacion",
   es: "Mira Mi Casa · reparación de viviendas", en: "Mira Mi Casa · home repairs", fundacion: ""
 });
-const DESTINOS_MB_TTL_MS = 600000;
+const DESTINOS_MB_TTL_MS = 60000;   // un minuto, como la red pública: una unidad recién verificada ya es destino válido
 let DESTINOS_MB_CACHE = null;   // { en: ms, mapa: Map, completo: bool }
 
 async function destinosMembresia(env) {
@@ -48116,9 +48190,10 @@ async function destinosMembresia(env) {
   const mapa = new Map([[DESTINO_MMC_MEMBRESIA.id, DESTINO_MMC_MEMBRESIA]]);
   let completo = false;
   try {
-    const r = env.ASSETS ? await env.ASSETS.fetch(new URL("/data/partners.json", ORIGIN)) : null;
-    if (r && r.ok) {
-      const data = await r.json();
+    /* La red PÚBLICA, no el archivo solo: una unidad verificada en /admin se
+       ofrece en el sitio en cuanto se verifica, y aquí tiene que existir. */
+    const data = await redPublica(env, ORIGIN);
+    if (data) {
       const partners = Array.isArray(data && data.partners) ? data.partners : [];
       for (const p of partners) {
         /* El mismo filtro que `buildProjectSelect` en app.js: fundacion con al
@@ -49847,8 +49922,7 @@ function paginaSocialfest(base, en) {
 
 async function rutaCompartir(env, url, id, lang) {
   try {
-    const r = await env.ASSETS.fetch(new URL("/data/partners.json", url.origin));
-    const j = await r.json();
+    const j = (await redPublica(env, url.origin)) || {};
     /* `consent.name === true` y no «distinto de false»: esto genera una PAGINA
        PUBLICA con el nombre de la fundacion, que es lo que se lleva un enlace
        compartido y lo que rastrea una vista previa. La regla 1 del cuestionario
@@ -50586,6 +50660,18 @@ export default {
       const sinWww = new URL(url.toString());
       sinWww.hostname = url.hostname.replace(/^www\./i, "");
       return Response.redirect(sinWww.toString(), 301);
+    }
+
+    /* LA RED PÚBLICA (0068, 19 nov 2026): partners.json más las unidades de
+       impacto que el equipo ya verificó en /admin. Va en `run_worker_first`
+       por la misma razón que el manifiesto de abajo. Si la mezcla falla, sale
+       el archivo tal cual: la calculadora nunca se queda sin datos. */
+    if (ruta === "/data/partners.json" && (request.method === "GET" || request.method === "HEAD")) {
+      const d = await redPublica(env, url.origin);
+      if (!d) return env.ASSETS.fetch(request);
+      return new Response(request.method === "HEAD" ? null : JSON.stringify(d), {
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=60" }
+      });
     }
 
     /* El manifiesto de Mira Mi Casa. Ver `MMC_MANIFIESTO` arriba para el motivo.
