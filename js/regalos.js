@@ -321,8 +321,22 @@ function rgFiltrados(){
   });
 }
 
+/* EL ORDEN SE BARAJA EN CADA VISITA (19 nov 2026, pedido de Sebas). Antes la
+   lista salía por código y todo el mundo veía primero a los mismos niños
+   —LET-0004, 0007, 0008…—, mientras los de la fundación que llegó después
+   (LET-0106 en adelante) quedaban siempre al final. Ahora cada carga de la
+   página reparte un número al azar por niño, y ese orden se mantiene mientras
+   la persona escoge: barajar en cada filtro haría saltar las tarjetas, y «Ver
+   más» repetiría o se saltaría niños. */
+var RG_AZAR = {};
+function rgAzar(codigo){
+  if (!(codigo in RG_AZAR)) RG_AZAR[codigo] = Math.random();
+  return RG_AZAR[codigo];
+}
+
 function rgPintaGrid(){
-  var lista = rgFiltrados(), total = (RG.datos.regalos || []).length;
+  var lista = rgFiltrados().sort(function(a, b){ return rgAzar(a.codigo) - rgAzar(b.codigo); });
+  var total = (RG.datos.regalos || []).length;
   if (RG.foco) lista = lista.filter(function(r){ return r.codigo === RG.foco; })
     .concat(lista.filter(function(r){ return r.codigo !== RG.foco; }));
   var recibe = RG.datos.campana && RG.datos.campana.recibe;
