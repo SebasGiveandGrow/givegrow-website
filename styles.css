@@ -2470,7 +2470,10 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 /* EL IDIOMA DE ESTA PÁGINA (3 nov 2026): español, inglés y sueco, que solo
    existe aquí. Quieto: tres palabras en gris, la activa en tinta con un filo
    plata. Los tokens son los fijos de la página, que no cambian de noche. */
-.rg-idioma{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 20px -12px}
+/* La fila de arriba: el idioma a la izquierda y los logos de la alianza a la
+   derecha (19 nov 2026). En el celular no caben juntos y los logos bajan. */
+.rg-cabeza{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 32px;margin:0 0 20px}
+.rg-idioma{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 0 -12px}
 .rg-idioma button{font:inherit;font-size:.875rem;line-height:1;color:var(--mu);background:none;border:1px solid transparent;border-radius:999px;padding:0 12px;min-height:36px;cursor:pointer}
 .rg-idioma button:hover{color:var(--ink)}
 .rg-idioma button.on{color:var(--ink);font-weight:600;border-color:var(--plata)}
@@ -2627,18 +2630,18 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
    esperando» y las reglas de excedentes. El rojo marca lo urgente; el dorado,
    lo cumplido. */
 /* La línea de la aliada, bajo el plazo. */
-/* LOS ALIADOS, ARRIBA (19 nov 2026): una fila de logos bajo la entrada, sin
+/* LOS ALIADOS (19 nov 2026): los logos a la altura del idioma, sin
    explicación. Alturas distintas a propósito: el de Ancla es apaisado y el de
    Positive Potential casi cuadrado, y así se leen del mismo peso. */
-.rg-aliados{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin:24px 0 0}
+.rg-aliados{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px}
 .rg-aliados-t{font-size:var(--fs-14);color:var(--mu)}
-.rg-aliados ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:16px 28px}
+.rg-aliados ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px}
 .rg-aliados li,.rg-aliados a{display:flex;align-items:center}
 .rg-aliados img{display:block;width:auto}
-.rg-aliados-ancla{height:50px}
-.rg-aliados-pp{height:72px}
-.rg-aliados-gg{font-size:1.15rem}
-@media (max-width:560px){.rg-aliados-ancla{height:42px}.rg-aliados-pp{height:62px}.rg-aliados-gg{font-size:1rem}}
+.rg-aliados-ancla{height:40px}
+.rg-aliados-pp{height:58px}
+.rg-aliados-gg{font-size:1rem}
+@media (max-width:560px){.rg-aliados-ancla{height:36px}.rg-aliados-pp{height:52px}.rg-aliados-gg{font-size:.95rem}}
 /* Incrustada en el sitio de la aliada: solo la campaña. */
 html.rg-incrustado #nav,html.rg-incrustado #nav-mobile,html.rg-incrustado body > footer,html.rg-incrustado a.wa,
 html.rg-incrustado .alma-fab,html.rg-incrustado .alma-intro,html.rg-incrustado .skip-link{display:none!important}
