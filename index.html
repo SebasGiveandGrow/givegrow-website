@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=1be02917">
+<link rel="stylesheet" href="/styles.css?v=45fbadd0">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=dc6b1aaf" defer></script>
+<script src="/app.js?v=02af96a2" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1641,6 +1641,34 @@
 
   <section class="cream" id="rg-usd" hidden>
     <div class="wrap"><div class="rg-usd-ok" id="rg-usd-ok" aria-live="polite"></div></div>
+  </section>
+
+  <!-- LA ALIANZA (19 nov 2026, pedido de Sebas): quién pone qué. El nombre va en
+       el h3 de cada una, así que el logo es decorativo (alt vacío) y no se lee
+       dos veces. Los logos: Ancla con su autorización de logo (partners.json);
+       Positive Potential, el que entregó Sebas; Give&Grow, su marca tipográfica. -->
+  <section id="rg-alianza">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="rg.alianza.h">Una alianza de tres organizaciones</h2>
+      <p class="rg-alianza-p" data-i18n="rg.alianza.p">Los regalos de diciembre son una alianza entre Fundación Ancla Colombia, Positive Potential y Give&amp;Grow. Cada una pone su parte.</p>
+      <ul class="rg-alianza">
+        <li>
+          <div class="rg-alianza-logo rg-alianza-ancla" aria-hidden="true"><img src="/img/ancla_logo.png" alt="" width="769" height="390" loading="lazy" decoding="async"></div>
+          <h3 class="h-comp4"><a href="https://www.anclacolombia.org/" target="_blank" rel="noopener">Fundación Ancla Colombia</a></h3>
+          <p data-i18n="rg.alianza.ancla">En Leticia, reúne con las familias los deseos de los niños y la autorización escrita de sus acudientes.</p>
+        </li>
+        <li>
+          <div class="rg-alianza-logo rg-alianza-pp" aria-hidden="true"><img src="/img/positive-potential_logo.webp" alt="" width="384" height="400" loading="lazy" decoding="async"></div>
+          <h3 class="h-comp4"><a href="https://www.positivepotential.org/" target="_blank" rel="noopener">Positive Potential</a></h3>
+          <p data-i18n="rg.alianza.pp">En Estados Unidos recibe las donaciones en dólares, como organización sin ánimo de lucro, y le entrega el recibo a quien se lo pida.</p>
+        </li>
+        <li>
+          <div class="rg-alianza-logo" aria-hidden="true"><span class="nlogo rg-alianza-gg">Give<em>&amp;</em>Grow</span></div>
+          <h3 class="h-comp4">Give&amp;Grow</h3>
+          <p data-i18n="rg.alianza.gg">Organiza la lista, recibe los pagos en pesos y sigue cada regalo hasta su entrega, con acta.</p>
+        </li>
+      </ul>
+    </div>
   </section>
 
   <section id="rg-reglas-sec">
