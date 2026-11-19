@@ -73,6 +73,14 @@
       "consentimiento": "autorización escrita en la Sección 7 del cuestionario de la fundación (18 nov 2026), firmada por su Representante Legal Suplente",
       "menores": false,
       "archivos": ["entropika_agua_filtrada.webp", "entropika_tuberia.webp", "entropika_granizal.webp"]
+    },
+    {
+      "id": "aliada-entropika-familias",
+      "descripcion": "Fotos del programa de agua de la Fundación Entropika en Granizal (Bello): familias con el filtro instalado. Con niñas, niños y un bebé identificables.",
+      "fecha": "2026-11-19",
+      "consentimiento": "autorización escrita de padres o acudientes en poder de la fundación, declarada en la Sección 7 de su cuestionario (18 nov 2026) y confirmada en persona por su Representante Legal Suplente (19 nov 2026)",
+      "menores": true,
+      "archivos": ["entropika_filtro_familia.webp", "entropika_filtro_hogar.webp"]
     }
   ],
   "retirados": [
