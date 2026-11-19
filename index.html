@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=a3d53640">
+<link rel="stylesheet" href="/styles.css?v=59776d91">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -1511,26 +1511,28 @@
     <div class="wrap">
       <!-- Sueco solo en esta página (3 nov 2026). Cada idioma se nombra en sí
            mismo, por eso los botones no llevan data-i18n; el grupo sí. -->
-      <div class="rg-idioma" role="group" aria-label="Idioma de esta página" data-i18n="rg.idioma" data-i18n-attr="aria-label">
-        <button type="button" data-idioma="es" data-act="setLang('es')" lang="es" aria-pressed="true" class="on">Español</button>
-        <button type="button" data-idioma="en" data-act="setLang('en')" lang="en" aria-pressed="false">English</button>
-        <button type="button" data-idioma="sv" data-act="setLang('sv')" lang="sv" aria-pressed="false">Svenska</button>
+      <div class="rg-cabeza">
+        <div class="rg-idioma" role="group" aria-label="Idioma de esta página" data-i18n="rg.idioma" data-i18n-attr="aria-label">
+          <button type="button" data-idioma="es" data-act="setLang('es')" lang="es" aria-pressed="true" class="on">Español</button>
+          <button type="button" data-idioma="en" data-act="setLang('en')" lang="en" aria-pressed="false">English</button>
+          <button type="button" data-idioma="sv" data-act="setLang('sv')" lang="sv" aria-pressed="false">Svenska</button>
+        </div>
+        <!-- LOS ALIADOS (19 nov 2026, pedido de Sebas): solo los logos, sin explicar
+             qué hace cada uno, a la altura del idioma. Reemplazan la línea «En
+             alianza con {aliada}», que nombraba solo a la de EE. UU. -->
+        <div class="rg-aliados">
+          <span class="rg-aliados-t" data-i18n="rg.alianza.h">Una alianza entre</span>
+          <ul>
+            <li><a href="https://www.anclacolombia.org/" target="_blank" rel="noopener"><img class="rg-aliados-ancla" src="/img/ancla_logo.png" alt="Fundación Ancla Colombia" width="769" height="390" decoding="async"></a></li>
+            <li><a href="https://www.positivepotential.org/" target="_blank" rel="noopener"><img class="rg-aliados-pp" src="/img/positive-potential_logo.webp" alt="Positive Potential" width="384" height="400" decoding="async"></a></li>
+            <li><span class="nlogo rg-aliados-gg">Give<em>&amp;</em>Grow</span></li>
+          </ul>
+        </div>
       </div>
       <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
       <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
       <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>
       <p class="rg-plazo" id="rg-plazo" aria-live="polite" hidden></p>
-      <!-- LOS ALIADOS, ARRIBA (19 nov 2026, pedido de Sebas): solo los logos, sin
-           explicar qué hace cada uno. Reemplaza la línea «En alianza con {aliada}»,
-           que nombraba solo a la de EE. UU. -->
-      <div class="rg-aliados rv d1">
-        <span class="rg-aliados-t" data-i18n="rg.alianza.h">Una alianza entre</span>
-        <ul>
-          <li><a href="https://www.anclacolombia.org/" target="_blank" rel="noopener"><img class="rg-aliados-ancla" src="/img/ancla_logo.png" alt="Fundación Ancla Colombia" width="769" height="390" decoding="async"></a></li>
-          <li><a href="https://www.positivepotential.org/" target="_blank" rel="noopener"><img class="rg-aliados-pp" src="/img/positive-potential_logo.webp" alt="Positive Potential" width="384" height="400" decoding="async"></a></li>
-          <li><span class="nlogo rg-aliados-gg">Give<em>&amp;</em>Grow</span></li>
-        </ul>
-      </div>
       <h2 class="rg-luces-t rv d2" data-i18n="rg.luces.t">Una luz por cada niño</h2>
       <p class="rg-luces-p rv d2" data-i18n="rg.luces.p">Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.</p>
       <div class="rg-zonas rv d2" id="rg-zonas" aria-live="polite"></div>
