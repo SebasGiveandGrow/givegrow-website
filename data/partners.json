@@ -493,6 +493,110 @@
           }
         ]
       }
+    },
+    {
+      "id": "entropika",
+      "name": "Fundación Entropika",
+      "type": "foundation",
+      "rol": [
+        "recibe"
+      ],
+      "lat": -4.215,
+      "lng": -69.94,
+      "area": {
+        "es": "Leticia · triple frontera amazónica, y Granizal (Bello, Antioquia)",
+        "en": "Leticia · Amazon tri-border area, and Granizal (Bello, Antioquia)"
+      },
+      "url": "https://www.entropika.org/es",
+      "instagram": "https://www.instagram.com/fentropika",
+      "impactUnits": [
+        {
+          "id": "entropika-filtro",
+          "cop": 250000,
+          "project": "Programa de Agua en la Vereda Granizal, Bello",
+          "es": "filtro de agua por familia",
+          "esPl": "filtros de agua por familia",
+          "en": "household water filter",
+          "enPl": "household water filters"
+        }
+      ],
+      "logo": "/img/entropika_logo.png",
+      "gallery": [
+        {
+          "src": "/img/jornadas/entropika_agua_filtrada.webp",
+          "alt": {
+            "es": "Un vaso de agua cruda junto a uno de agua ya filtrada, en una casa de Granizal (Bello)",
+            "en": "A glass of raw water next to one of filtered water, in a home in Granizal (Bello)"
+          }
+        },
+        {
+          "src": "/img/jornadas/entropika_tuberia.webp",
+          "alt": {
+            "es": "Mujeres de la comunidad cargan la tubería para instalar los filtros",
+            "en": "Women from the community carry the piping to install the filters"
+          }
+        },
+        {
+          "src": "/img/jornadas/entropika_granizal.webp",
+          "alt": {
+            "es": "Laderas de la vereda Granizal, en Bello, donde no hay acueducto",
+            "en": "Hillsides of Granizal, in Bello, where there is no water mains"
+          }
+        }
+      ],
+      "consent": {
+        "name": true,
+        "logo": true,
+        "photos": true,
+        "minorsImageProtected": true,
+        "date": "2026-11-18",
+        "source": "Sección 7 del cuestionario de la fundación, diligenciado el 18 nov 2026 por su Representante Legal Suplente: autoriza nombre, logo y las fotos que envíe o apruebe expresamente, y declara contar con autorización escrita de padres o acudientes de los menores que aparezcan. Se publican 3 de las 5 fotos enviadas, todas sin menores; las 2 con niñas y niños reconocibles quedan fuera. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada entropika\"."
+      },
+      "poblacion": {
+        "es": "≈220 personas de forma regular y ≈2.800 con proyectos de impacto masivo, reportadas por la fundación",
+        "en": "≈220 people on a regular basis and ≈2,800 through large-scale projects, as reported by the foundation"
+      },
+      "profile": {
+        "badge": {
+          "es": "Fundación amazónica · conservación y agua",
+          "en": "Amazonian foundation · conservation and water"
+        },
+        "tagline": {
+          "es": "Conservación en acción.",
+          "en": "Conservation in action."
+        },
+        "years": {
+          "es": "Desde 2007 en la triple frontera amazónica",
+          "en": "In the Amazon tri-border area since 2007"
+        },
+        "about": {
+          "es": "La Fundación Entropika nació en 2007 en Leticia, a partir del rescate de un mono churuco víctima del tráfico ilegal de fauna. Trabaja en la triple frontera entre Colombia, Perú y Brasil, con población indígena y rural, convencida de que la naturaleza solo se protege si las comunidades tienen agua, ingresos dignos y voz. Combina conservación, investigación y fortalecimiento comunitario, y hoy suma programas de agua potable, bienestar animal, turismo regenerativo, gobernabilidad, veedurías ciudadanas y apoyo psicosocial. La fundación reporta 40 publicaciones científicas, y que su trabajo contra el tráfico del mono nocturno contribuyó a que la especie fuera declarada «En Peligro» en 2024.",
+          "en": "Fundación Entropika was founded in 2007 in Leticia, after the rescue of a woolly monkey that had been trafficked illegally. It works in the tri-border area between Colombia, Peru and Brazil, with Indigenous and rural communities, convinced that nature can only be protected if communities have water, a decent income and a voice. It combines conservation, research and community capacity-building, and today runs programmes on drinking water, animal welfare, regenerative tourism, governance, citizen oversight and psychosocial support. The foundation reports 40 scientific publications, and that its work against the trafficking of night monkeys helped the species be listed as «Endangered» in 2024."
+        },
+        "programs": [
+          {
+            "name": "Agua potable",
+            "desc": {
+              "es": "Acueductos comunitarios que administran las propias comunidades indígenas, y filtros domiciliarios en la vereda Granizal de Bello, que no tiene acueducto. La fundación reporta agua potable para 25 comunidades indígenas y 7 colegios desde 2014 (unas 10.600 personas), y 939 filtros entregados en Granizal, de los que hoy 3.785 personas usan uno activo.",
+              "en": "Community water systems run by the Indigenous communities themselves, and household filters in Granizal, in Bello, which has no water mains. The foundation reports drinking water for 25 Indigenous communities and 7 schools since 2014 (about 10,600 people), and 939 filters delivered in Granizal, where 3,785 people now use an active one."
+            }
+          },
+          {
+            "name": "Conservación",
+            "desc": {
+              "es": "Investigación, educación ambiental y ciencia ciudadana con las comunidades locales: censos de grandes vertebrados en Colombia y Perú, y monitoreo de fauna en humedales y ecosistemas urbanos, con un semillero de jóvenes y docentes que se reúne cada semana.",
+              "en": "Research, environmental education and citizen science with local communities: large-vertebrate surveys in Colombia and Peru, and wildlife monitoring in wetlands and urban ecosystems, with a weekly group of young people and teachers."
+            }
+          },
+          {
+            "name": "Bienestar animal",
+            "desc": {
+              "es": "Jornadas de esterilización de perros y gatos. La fundación reporta 3.796 esterilizaciones.",
+              "en": "Spay and neuter campaigns for dogs and cats. The foundation reports 3,796 procedures."
+            }
+          }
+        ]
+      }
     }
   ]
 }

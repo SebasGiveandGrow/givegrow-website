@@ -65,6 +65,14 @@
       "consentimiento": "autorización escrita en archivo físico de la Fundación (confirmado por Sebas el 29 sep 2026)",
       "menores": true,
       "archivos": ["benef_01.jpg", "benef_03.jpg", "campo_01.jpg", "campo_04.jpg"]
+    },
+    {
+      "id": "aliada-entropika",
+      "descripcion": "Fotos del programa de agua de la Fundación Entropika en Granizal (Bello): agua filtrada, instalación de tubería y el paisaje de la vereda. Sin menores.",
+      "fecha": "2026-11-18",
+      "consentimiento": "autorización escrita en la Sección 7 del cuestionario de la fundación (18 nov 2026), firmada por su Representante Legal Suplente",
+      "menores": false,
+      "archivos": ["entropika_agua_filtrada.webp", "entropika_tuberia.webp", "entropika_granizal.webp"]
     }
   ],
   "retirados": [

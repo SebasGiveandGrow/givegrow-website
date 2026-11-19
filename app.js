@@ -5305,9 +5305,13 @@ function renderFicha(fid){
       + '<span class="ey">'+t("ficha.aside.ey")+'</span>'
       + '<h2>'+(u ? t("ficha.imp.t") : t("ficha.cta.t"))+'</h2>';
     if (u){
-      var qs = [10000, 20000, 50000, 100000];
+      /* Si la unidad más barata pasa de $100.000 (un filtro de agua), los
+         montos chicos no alcanzan ni para una: se ofrecen 1, 2 y 4 unidades. */
+      var minU = Math.min.apply(null, p.impactUnits.map(function(x){ return x.cop || Infinity; }));
+      var grande = minU > 100000 && isFinite(minU);
+      var qs = grande ? [minU, minU*2, minU*4] : [10000, 20000, 50000, 100000];
       lat += '<div class="fimp-row">' + qs.map(function(q,qi){
-        return '<button type="button" class="fimp-q'+(qi===1?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
+        return '<button type="button" class="fimp-q'+(qi===(grande?0:1)?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
       }).join('') + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'"></p>';
     }
     lat += '<a class="ficha-cta-btn" href="/donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
