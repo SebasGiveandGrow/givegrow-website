@@ -2627,7 +2627,18 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
    esperando» y las reglas de excedentes. El rojo marca lo urgente; el dorado,
    lo cumplido. */
 /* La línea de la aliada, bajo el plazo. */
-.rg-aliada{font-size:var(--fs-14);color:var(--oro-texto);font-weight:600;margin:8px 0 0}
+/* LOS ALIADOS, ARRIBA (19 nov 2026): una fila de logos bajo la entrada, sin
+   explicación. Alturas distintas a propósito: el de Ancla es apaisado y el de
+   Positive Potential casi cuadrado, y así se leen del mismo peso. */
+.rg-aliados{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin:24px 0 0}
+.rg-aliados-t{font-size:var(--fs-14);color:var(--mu)}
+.rg-aliados ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:16px 28px}
+.rg-aliados li,.rg-aliados a{display:flex;align-items:center}
+.rg-aliados img{display:block;width:auto}
+.rg-aliados-ancla{height:50px}
+.rg-aliados-pp{height:72px}
+.rg-aliados-gg{font-size:1.15rem}
+@media (max-width:560px){.rg-aliados-ancla{height:42px}.rg-aliados-pp{height:62px}.rg-aliados-gg{font-size:1rem}}
 /* Incrustada en el sitio de la aliada: solo la campaña. */
 html.rg-incrustado #nav,html.rg-incrustado #nav-mobile,html.rg-incrustado body > footer,html.rg-incrustado a.wa,
 html.rg-incrustado .alma-fab,html.rg-incrustado .alma-intro,html.rg-incrustado .skip-link{display:none!important}
@@ -2643,25 +2654,6 @@ html.rg-incrustado #page-regalos{padding-bottom:24px}
 .rg-comp:hover{color:var(--ink)}
 .rg-comp .rg-ic{width:15px;height:15px}
 .rg-card.is-foco{border-color:var(--oro);box-shadow:0 0 0 2px var(--oro),var(--shadow)}
-/* LA ALIANZA (19 nov 2026): tres columnas, cada logo en una caja de la misma
-   altura para que los tres se lean parejos. La página es blanca siempre (de
-   día y de noche), así que los logos van tal cual, sin recuadro. */
-.rg-alianza-p{max-width:62ch;margin:8px 0 28px;color:var(--ink-soft)}
-.rg-alianza{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
-.rg-alianza li{border-top:1px solid var(--plata);padding-top:20px}
-.rg-alianza-logo{height:112px;display:flex;align-items:center;margin-bottom:16px}
-/* El logo de Positive Potential llegó sobre un fondo gris muy claro y se
-   veía como un recuadro sobre los copos: el archivo del sitio ya va con ese
-   fondo vuelto transparente. */
-.rg-alianza-logo img{display:block;width:auto;height:auto}
-.rg-alianza-ancla img{max-height:84px;max-width:200px}
-.rg-alianza-pp img{max-height:112px;max-width:120px}
-.rg-alianza-gg{font-size:1.6rem}
-.rg-alianza h3{margin:0 0 6px}
-.rg-alianza h3 a{color:inherit;text-decoration:none}
-.rg-alianza h3 a:hover{text-decoration:underline;text-underline-offset:3px}
-.rg-alianza p{margin:0;color:var(--ink-soft)}
-@media (max-width:720px){.rg-alianza{grid-template-columns:1fr;gap:24px}.rg-alianza-logo{height:96px}.rg-alianza-ancla img{max-height:72px}.rg-alianza-pp img{max-height:96px}}
 .rg-reglas{margin-top:36px;padding-top:22px;border-top:1px solid var(--plata)}
 /* Desde el 12 nov 2026 las reglas van en su propia sección al final: sin el filo de arriba. */
 #rg-reglas-sec .rg-reglas{margin-top:0;padding-top:0;border-top:0}
