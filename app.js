@@ -1810,6 +1810,8 @@ var I18N = {
     "ficha.imp.calc":"Con {a} aquí logras aproximadamente {x}.",
     "ficha.imp.min":"Elige un monto para ver el impacto equivalente.",
     "ficha.imp.prog":"Elige el programa",
+    "ficha.imp.incluye":"Qué incluye cada {u}",
+    "ficha.imp.verif":"Costo verificado por Give&Grow contra un soporte de la fundación.",
     "ficha.hub.t":"Cómo la fortalece el HUB SOCIAL",
     "ficha.web":"Ver sitio web",
     "ficha.cta.t":"Dona con destino a esta fundación.",
@@ -5322,7 +5324,7 @@ function renderFicha(fid){
           return '<button type="button" class="fimp-u'+(xi===0?' on':'')+'" aria-pressed="'+(xi===0)+'" data-act="fichaImpUnidad(this,\''+esc(p.id)+'\','+xi+')">'+esc(x.project || x[lang] || x.es)+'</button>';
         }).join('') + '</div>';
       }
-      lat += '<div class="fimp-row" id="fimp-row">' + fimpMontos(p.id, u) + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'" data-ui="0"></p>';
+      lat += '<div class="fimp-row" id="fimp-row">' + fimpMontos(p.id, u) + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'" data-ui="0"></p><div id="fimp-inc" class="fimp-inc" hidden></div>';
     }
     lat += '<a class="ficha-cta-btn" href="/donar"'+(u ? ' data-act="donarDesdeFicha(\''+esc(p.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
       + '<p class="ficha-apoyo-nota">'+t("ficha.cta.p")+'</p>' + tiraHtml() + '</div>';
@@ -6295,6 +6297,16 @@ function fichaImpCalc(btn, fid){
     out.innerHTML = parts.length
       ? t("ficha.imp.calc").replace("{a}","<b>"+amount+"</b>").replace("{x}",parts.join(" · "))
       : t("ficha.imp.min");
+    /* Lo que la fundación dice que incluye cada unidad, tal como lo verificó el
+       equipo (0068). Sin «qué incluye» en los dos idiomas, no se pinta. */
+    var inc = document.getElementById("fimp-inc"), uu = p.impactUnits[ui];
+    if (inc){
+      var txt = uu && uu.incluye ? (uu.incluye[lang] || uu.incluye.es || "") : "";
+      inc.hidden = !txt;
+      inc.innerHTML = txt ? '<span class="fimp-inc-t">'+escapeHtml(t("ficha.imp.incluye").replace("{u}", uu[lang]||uu.es))+'</span>'
+        + '<p>'+escapeHtml(txt)+'</p>'
+        + (uu.verificada ? '<p class="fimp-inc-v">'+escapeHtml(t("ficha.imp.verif"))+'</p>' : '') : "";
+    }
   });
 }
 var INVENTORY_DATA = null;
