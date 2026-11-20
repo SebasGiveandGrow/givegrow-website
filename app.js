@@ -2201,6 +2201,89 @@ var I18N = {
     "calc.note.ph":"Tu mensaje viajará con tu donación y aparecerá en tu recibo.",
     "calc.impact":"Tu impacto",
     "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del HUB SOCIAL.",
+    "calc.banda.ey":"Tu aporte",
+    "calc.p1.t":"Destino",
+    "calc.p1.nota":"Elige un programa. A la derecha ves lo que alcanza tu aporte.",
+    "calc.ver.aria":"Filtrar destinos por tema",
+    "calc.ver":"Ver:",
+    "calc.todos":"Todos",
+    "calc.cambiar":"Cambiar destino",
+    "calc.p2.t":"Monto",
+    "calc.p2.nota":"Los montos sugeridos se ajustan a lo que elegiste. También puedes escribir el tuyo.",
+    "calc.freq.aria":"Frecuencia",
+    "calc.cur.aria":"Moneda",
+    "calc.sug.aria":"Montos sugeridos",
+    "calc.p3.t":"Confirmar",
+    "calc.p3.nota":"Revisa el resumen antes de pasar al pago.",
+    "tema.emergencias":"Emergencias",
+    "tema.alimentacion":"Alimentación",
+    "tema.educacion":"Educación y arte",
+    "tema.agua":"Agua",
+    "calc.dest.general":"Donde más se necesite",
+    "calc.dest.general.sub":"Give&Grow · toda la red",
+    "calc.dest.general.desc":"Fondo general: va a donde la red lo necesite, con la misma trazabilidad.",
+    "calc.dest.brigada":"Brigada de atención a emergencia",
+    "calc.dest.brigada.desc":"Sismo del 10 de agosto · 5 sectores · se reporta con actas de entrega.",
+    "calc.dest.mmc":"Mira Mi Casa",
+    "calc.dest.mmc.desc":"Reparación de viviendas afectadas por el sismo.",
+    "calc.para.general":"para el fondo general de la red",
+    "calc.para.brigada":"para la brigada de atención a emergencia",
+    "calc.para.mmc":"para Mira Mi Casa",
+    "calc.sincosto":"Este destino no tiene costo por unidad: tu aporte se reporta en pesos, con su evidencia.",
+    "calc.mmc.sincosto":"Mira Mi Casa no publica un costo por vivienda: tu aporte se reporta en pesos, con su evidencia.",
+    "calc.por":"por {u}",
+    "calc.verificado":"costo verificado",
+    "calc.falta":"Faltan {f}\u00a0para\u00a01",
+    "calc.b.u":"una sola vez",
+    "calc.b.m":"cada mes",
+    "calc.b.a":"cada año",
+    "calc.para":"para {p}",
+    "calc.de":"de la {f}",
+    "calc.cada":"Cada {u} cuesta {c}.",
+    "calc.costo.verif":"Costo verificado por Give&Grow.",
+    "calc.costo.rep":"Costo reportado por la fundación.",
+    "calc.escribe":"Escribe un monto para ver qué alcanza.",
+    "calc.rango":"Con un monto entre $5.000 y $20.000.000 verás aquí qué alcanza.",
+    "calc.minimo":"El aporte mínimo en línea es $5.000.",
+    "calc.maximo":"Para aportes mayores a $20.000.000, escríbenos y lo coordinamos.",
+    "calc.solonum":"Escribe el monto en números, por ejemplo 100.000.",
+    "calc.parte":"Tu aporte cubre {p} de 1 {u}; faltan {f}.",
+    "calc.menos1":"menos del 1 %",
+    "calc.pct":"el {n} %",
+    "calc.ajustar":"Ajustar a {m}",
+    "calc.completas":"Con {f} más completas {n} {u}.",
+    "calc.doce":"En doce meses, a este ritmo: {n} {u}, {t} en total.",
+    "calc.grande":"Es una equivalencia con el costo publicado; un aporte de este tamaño se coordina con la fundación.",
+    "calc.tf.m":" al mes",
+    "calc.tf.a":" al año",
+    "calc.tf.u":", una sola vez,",
+    "calc.r.costo":"Costo de la unidad",
+    "calc.r.desc":"Descuento tributario",
+    "calc.r.anual":"En un año",
+    "calc.r.nivel":"Nivel de membresía",
+    "calc.r.evid":"Evidencia",
+    "calc.desc.v":"{v} de descuento posible (25 %); costo neto {n}, si te aplica.",
+    "calc.evid":"Acta de entrega y número de guía para rastrear tu aporte.",
+    "calc.evid.brigada":"Actas de entrega por sector y número de guía para rastrear tu aporte.",
+    "calc.guia":"El número de guía se asigna al confirmar el pago; con él consultas el acta.",
+    "calc.incluye":"Qué incluye",
+    "calc.sigue":"Tu destino sigue siendo «{p}».",
+    "calc.vertodos":"Ver todos los destinos",
+    "red.ver.aria":"Filtrar fundaciones por tema",
+    "red.pie":"Las cifras de población y los costos por unidad los reporta cada fundación; «verificado» indica que Give&Grow revisó el soporte del costo. Las fotografías se publican con autorización de la fundación que las aporta.",
+    "red.todas":"Todas",
+    "red.dnd":"Dónde",
+    "red.con":"Con quién",
+    "red.ficha":"Ver ficha",
+    "red.llevar":"Te lleva a la calculadora.",
+    "red.aporta.t":"Aporta y recibe.",
+    "red.aporta.p":"No publica costo por unidad: en la red aporta recursos y también recibe para sus programas.",
+    "red.sincosto":"Todavía no publica el costo de una unidad de su trabajo.",
+    "red.programas":"Programas: ",
+    "red.foto":"Foto: {f}, publicada con su autorización.",
+    "red.vacio":"No hay fundaciones en ese tema.",
+    "red.vermas":"Ver las {n} unidades",
+    "red.verificado":"verificado por Give&Grow",
     "origen.imgalt":"El fundador con la comunidad de niños y niñas en una jornada en La Guajira",
     "origen.tl.ey":"El recorrido",
     "origen.tl.t":"De caminar el territorio a fundar una red.",
@@ -4187,7 +4270,7 @@ function animateCounters(){
 /* `freq:"u"` y no "m" (auditoria del 28 sep 2026): la calculadora abria en
    Mensual y cobraba UNA vez, mientras el debito automatico de verdad vive en
    /pago/metodo. Arranca en Unico; Mensual lleva alla. */
-var calc = { cur:"COP", freq:"u", val:200000, mode:"ind", partnerId:"", projectId:"general", note:"" };
+var calc = { cur:"COP", freq:"u", val:100000, mode:"ind", partnerId:"", projectId:"general", note:"" };
 /* LA TASA LA TRAE EL SERVIDOR, de la TRM oficial. Este numero era 4200 y la TRM
    del 3 sep 2026 es 3140,55: un 34% de error en un dato con el que alguien decide
    cuanto donar.
@@ -4323,75 +4406,174 @@ function opcionesDestino(conBrigada){
   }
   return html;
 }
-function buildProjectSelect(){
-  var sel = document.getElementById("calc-project");
-  /* La membresia se repinta en el mismo momento que la calculadora: las dos
-     dependen de que `partners.json` haya llegado, y este es el punto por el
-     que pasan las dos cargas —la del arranque y la del cambio de idioma—. */
-  try { buildMbDestino(); } catch(e){}
-  if (!sel) return;
-  sel.innerHTML = opcionesDestino(true);
-  sel.value = calc.projectId || "general";
+/* ---------- LA CALCULADORA COMO INFORME (20 nov 2026) ----------
+   Antes era un <select> con optgroups; ahora es una lista con radios, filtrable
+   por tema, y cada línea dice lo que alcanza el monto en ese programa. El estado
+   sigue en `calc` (projectId, partnerId, val, freq, cur): es lo único que lee
+   js/pago.js, así que el cobro no cambió.
+
+   Los destinos especiales (fondo general, brigada, Mira Mi Casa) no salen de
+   partners.json; las unidades sí, con su `tema`. Una unidad sin tema sale en
+   «Todos» y no en ningún filtro: se le pone el tema en partners.json. */
+var CALC_TEMAS = ["alimentacion","educacion","agua","emergencias"];
+var CALC_DEST = [], CALC_POR_ID = {};
+var CINF = { filtro:"todos", plegado:false, err:false, aviso:"", sugerido:0, toco:false, ultimaN:"", tAnuncio:0 };
+var CINF_MIN = 5000, CINF_MAX = 20000000, CINF_UMBRAL = 10000000;
+
+function cinfSinParen(s){ return String(s||"").replace(/\s*\([^)]*\)\s*$/,""); }
+function cinfMiles(n){ return Math.floor(n).toLocaleString(lang==="en" ? "en-US" : "es-CO"); }
+function cinfFmt(cop){ return calc.cur === "USD" ? "US$" + cinfMiles(cop / USD_RATE) : "$" + cinfMiles(cop); }
+function cinfUnidad(u, n){
+  var s = (lang==="en") ? (u.en||u.es) : u.es, p = (lang==="en") ? (u.enPl||u.en||u.es) : (u.esPl||u.es);
+  s = cinfSinParen(s); p = cinfSinParen(p);
+  s = s.charAt(0).toLowerCase() + s.slice(1); p = p.charAt(0).toLowerCase() + p.slice(1);
+  return n === 1 ? s : p;
 }
-function setProject(unitId){
-  calc.projectId = unitId;
-  var sel = document.getElementById("calc-project");
-  if (sel){ var opt = sel.options[sel.selectedIndex]; calc.partnerId = opt ? (opt.getAttribute("data-partner")||"") : ""; }
-  /* setFreq ya llama a calcUpdate; llamarlo dos veces solo repinta de más. */
-  if (esBrigada(unitId) && calc.freq !== "u"){ setFreq("u"); return; }
+function cinfDestinos(){
+  var d = [];
+  d.push({ id:"general", tema:null, nombre:t("calc.dest.general"), sub:t("calc.dest.general.sub"), desc:t("calc.dest.general.desc"), para:t("calc.para.general"), partner:"" });
+  d.push({ id:BRIGADA.id, tema:"emergencias", nombre:t("calc.dest.brigada"), sub:"Give&Grow", desc:t("calc.dest.brigada.desc"), para:t("calc.para.brigada"), partner:"" });
+  d.push({ id:MMC_DESTINO.id, tema:"emergencias", nombre:t("calc.dest.mmc"), sub:"Give&Grow", desc:t("calc.dest.mmc.desc"), para:t("calc.para.mmc"), partner:"", sinCosto:t("calc.mmc.sincosto") });
+  var ps = (PARTNERS_DATA || PARTNERS_FALLBACK || []).filter(function(p){ return p.type==="foundation" && p.impactUnits && p.impactUnits.length; });
+  for (var i=0;i<ps.length;i++){
+    for (var k=0;k<ps[i].impactUnits.length;k++){
+      var u = ps[i].impactUnits[k]; if (!u || !u.id || !(u.cop > 0)) continue;
+      d.push({ id:u.id, tema:(CALC_TEMAS.indexOf(u.tema)>=0 ? u.tema : null), nombre:u.project || cinfSinParen(u[lang]||u.es),
+               fund:ps[i].name, partner:ps[i].id, u:u, cop:u.cop, i:d.length });
+    }
+  }
+  /* Orden: el fondo general; los temas con costo publicado; los de monto abierto; sin tema al final. */
+  var orden = {}; CALC_TEMAS.forEach(function(x,i){ orden[x] = i+1; });
+  d.forEach(function(x,i){ x.i = i; });
+  d.sort(function(a,b){
+    var ta = a.id==="general" ? 0 : (a.tema ? orden[a.tema] : 99), tb = b.id==="general" ? 0 : (b.tema ? orden[b.tema] : 99);
+    return ta !== tb ? ta - tb : a.i - b.i;
+  });
+  return d;
+}
+/* Índice de temas: una línea de texto, sin conteos. Solo los temas que tienen algo. */
+function cinfIndice(cont, temas, actual, todosKey, alElegir){
+  if (!cont) return;
+  var h = '<span class="cinf-ver-et">'+escapeHtml(t("calc.ver"))+'</span>';
+  var ops = [{id:"todos", n:t(todosKey)}].concat(temas.map(function(x){ return {id:x, n:t("tema."+x)}; }));
+  ops.forEach(function(o,i){
+    h += '<span class="cinf-ver-i">'+(i?'<span class="cinf-sep" aria-hidden="true">·</span>':'')
+      + '<button type="button" data-t="'+o.id+'" aria-pressed="'+(o.id===actual?"true":"false")+'">'+escapeHtml(o.n)+'</button></span>';
+  });
+  cont.innerHTML = h;
+  cont.onclick = function(e){ var b = e.target.closest("button[data-t]"); if (b) alElegir(b.getAttribute("data-t")); };
+}
+function buildProjectSelect(){
+  /* La membresía se repinta en el mismo momento que la calculadora: las dos
+     dependen de que `partners.json` haya llegado. */
+  try { buildMbDestino(); } catch(e){}
+  var led = document.getElementById("calc-ledger");
+  if (!led) return;
+  CALC_DEST = cinfDestinos(); CALC_POR_ID = {};
+  CALC_DEST.forEach(function(d){ CALC_POR_ID[d.id] = d; });
+  if (!CALC_POR_ID[calc.projectId]) calc.projectId = "general";
+  calc.partnerId = CALC_POR_ID[calc.projectId].partner || "";
+  var temas = CALC_TEMAS.filter(function(x){ return CALC_DEST.some(function(d){ return d.tema === x; }); });
+  if (CINF.filtro !== "todos" && temas.indexOf(CINF.filtro) < 0) CINF.filtro = "todos";
+  cinfIndice(document.getElementById("calc-ver"), temas, CINF.filtro, "calc.todos", function(x){ CINF.filtro = x; CINF.plegado = false; cinfPintarLedger(); });
+  var h = "";
+  CALC_DEST.forEach(function(d){
+    var sub = d.cop
+      ? escapeHtml(d.fund.replace(/^Fundaci[oó]n /,"")) + ' · <span class="cinf-num">'+escapeHtml(fmtCOP(d.cop))+'</span> '
+        + escapeHtml(t("calc.por").replace("{u}", cinfUnidad(d.u,1))) + (d.u.verificada ? ' · '+escapeHtml(t("calc.verificado")) : '')
+      : escapeHtml(d.sub);
+    h += '<label class="cinf-fila" data-id="'+escapeHtml(d.id)+'">'
+      + '<input type="radio" name="calc-destino" value="'+escapeHtml(d.id)+'">'
+      + '<span class="cinf-prog"><b>'+escapeHtml(d.nombre)+'</b><span class="cinf-sub">'+sub+'</span>'
+      + (d.desc ? '<span class="cinf-desc">'+escapeHtml(d.desc)+'</span>' : '') + '</span>'
+      + '<span class="cinf-alc"></span></label>';
+  });
+  led.innerHTML = h;
+  led.onchange = function(e){ if (e.target && e.target.name === "calc-destino") setProject(e.target.value); };
+  /* Elegir con el dedo o el ratón pliega la lista; con flechas no (detail 0), para no romper el teclado. */
+  led.onclick = function(e){
+    var f = e.target.closest(".cinf-fila");
+    if (f && e.detail > 0 && e.target.tagName !== "INPUT"){ CINF.plegado = true; cinfPintarLedger(); cinfIr("calc-paso-dest"); }
+  };
+  var cb = document.getElementById("calc-cambiar");
+  if (cb) cb.onclick = function(){
+    CINF.plegado = false; cinfPintarLedger();
+    var r = led.querySelector("input:checked"); if (r) r.focus({preventScroll:true});
+    cinfIr("calc-paso-dest");
+  };
+  cinfPintarLedger();
+  cinfPonerMonto();
   calcUpdate();
 }
-/* CTA de la ficha: abre la calculadora con el proyecto de ESA fundación ya elegido,
-   para que el donante no tenga que volver a buscarla en el selector. */
+function cinfIr(id){
+  var e = document.getElementById(id);
+  var quieto = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (e && e.scrollIntoView) e.scrollIntoView({behavior: quieto ? "auto" : "smooth", block:"start"});
+}
+function cinfPintarLedger(){
+  var led = document.getElementById("calc-ledger"); if (!led) return;
+  var ver = document.getElementById("calc-ver");
+  if (ver) ver.querySelectorAll("button[data-t]").forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-t")===CINF.filtro ? "true" : "false"); });
+  led.querySelectorAll(".cinf-fila").forEach(function(r){
+    var d = CALC_POR_ID[r.getAttribute("data-id")]; if (!d) return;
+    r.hidden = !(CINF.filtro === "todos" || d.tema === CINF.filtro);
+    var sel = d.id === calc.projectId;
+    r.classList.toggle("sel", sel); r.querySelector("input").checked = sel;
+  });
+  var d = CALC_POR_ID[calc.projectId], av = document.getElementById("calc-l-aviso");
+  if (av){
+    if (d && CINF.filtro !== "todos" && d.tema !== CINF.filtro){
+      av.innerHTML = escapeHtml(t("calc.sigue").replace("{p}", d.nombre)) + ' <button type="button" class="cinf-enlace" id="calc-ver-todos">'+escapeHtml(t("calc.vertodos"))+'</button>';
+      av.hidden = false;
+      document.getElementById("calc-ver-todos").onclick = function(){ CINF.filtro = "todos"; cinfPintarLedger(); };
+    } else { av.hidden = true; av.textContent = ""; }
+  }
+  var paso = document.getElementById("calc-paso-dest");
+  if (paso) paso.classList.toggle("plegado", CINF.plegado);
+}
+function setProject(unitId){
+  if (!CALC_POR_ID[unitId]) return;
+  calc.projectId = unitId;
+  calc.partnerId = CALC_POR_ID[unitId].partner || "";
+  CINF.toco = true;
+  cinfPintarLedger();
+  CINF.sugDe = null;
+  /* setFreq ya llama a calcUpdate; llamarlo dos veces solo repinta de más. */
+  if (esBrigada(unitId) && calc.freq !== "u"){ setFreq("u"); return; }
+  calcUpdate(true);
+}
+/* CTA de la ficha y de la red: abre la calculadora con ESE destino elegido.
+   Con `cop` (viene de la ficha), aporte único por ese valor; sin él, el monto
+   que ya estaba escrito se respeta. */
 function donarA(unitId, cop){
   go("donar");
   loadPartners().then(function(){
     try { buildProjectSelect(); } catch(e){}
-    /* Con monto (viene de la ficha): aporte único por ese valor. */
     if (cop > 0){
-      calc.val = cop;
-      var man = document.getElementById("calc-manual"); if (man) man.value = "";
-      syncSlider();
+      calc.val = cop; cinfPonerMonto();
       if (calc.freq !== "u") setFreq("u");
     }
-    var sel = document.getElementById("calc-project");
-    if (!sel || !unitId){ calcUpdate(); return; }
-    sel.value = unitId;
-    if (sel.value !== unitId) return;   // la unidad ya no existe: se queda en el fondo general
+    if (!unitId || !CALC_POR_ID[unitId]){ calcUpdate(); return; }
+    if (CINF.filtro !== "todos" && CALC_POR_ID[unitId].tema !== CINF.filtro) CINF.filtro = "todos";
+    CINF.plegado = true;
     setProject(unitId);
-    var dest = document.querySelector("#page-donar .calc-dest");
-    if (dest && dest.scrollIntoView) dest.scrollIntoView({block:"center"});
+    setTimeout(function(){ cinfIr("calc-paso-dest"); }, 60);
   });
 }
 /* Nombre legible del destino elegido, tal como debe leerse en el recibo y en el
-   certificado. Sale del <option> visible, que ya está en el idioma correcto. */
+   certificado: programa y fundación, en el idioma de la página. */
 function etiquetaDestino(){
   if (!calc.projectId || calc.projectId === "general") return null;
-  var sel = document.getElementById("calc-project");
-  if (sel){
-    for (var i=0;i<sel.options.length;i++){
-      if (sel.options[i].value === calc.projectId) return sel.options[i].text;
-    }
-  }
   if (esBrigada(calc.projectId)) return t("brigada.opcion");
   if (esMMC(calc.projectId)) return t("mmc.donar.opcion");
+  var d = CALC_POR_ID[calc.projectId];
+  if (d && d.u) return d.nombre;
   return calc.projectId;
 }
 
 /* Abre la calculadora con la brigada ya elegida. Es el destino del enlace
    corto #brigada, que es lo que se comparte en redes y en WhatsApp. */
-function donarBrigada(){
-  go("donar");
-  loadPartners().then(function(){
-    try { buildProjectSelect(); } catch(e){}
-    var sel = document.getElementById("calc-project");
-    if (!sel) return;
-    sel.value = BRIGADA.id;
-    setProject(BRIGADA.id);
-    var dest = document.querySelector("#page-donar .calc-dest");
-    if (dest && dest.scrollIntoView) dest.scrollIntoView({block:"center"});
-  });
-}
+function donarBrigada(){ donarA(BRIGADA.id); }
 
 function onNote(v){
   calc.note = String(v).slice(0,280);
@@ -4503,16 +4685,8 @@ function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 function setCur(c){
   /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
   if (!document.getElementById("page-donar")) return;
-  /* SIN TASA NO HAY DOLARES, y hasta hoy si los habia. Con `/api/trm` caido la
-     calculadora decia «No pudimos consultar la TRM en este momento» y debajo
-     enseñaba $16, $48 y $764 en dolares: cifras que solo pueden salir de una
-     tasa, sacadas del 3140.55 que este archivo lleva escrito como valor inicial
-     —sin fecha y sin fuente—. Medido contra produccion el 12 sep 2026.
-     Es exactamente lo que el comentario de aqui abajo dice haber quitado: «1 USD
-     = $4.200 (referencia)» no se podia comprobar y estaba mal.
-     Asi que no se entra en dolares sin tasa. Y se reintenta, porque el fallo
-     real casi siempre es un parpadeo: si la tasa llega, se cumple lo que el
-     usuario pidio y se pasa a dolares sin que tenga que volver a pulsar. */
+  /* SIN TASA NO HAY DOLARES: no se entra en dólares sin la TRM del día (ver
+     `trmCarga`). Se reintenta, porque el fallo real casi siempre es un parpadeo. */
   if (c === "USD" && !TRM_INFO){
     var sin = document.getElementById("calc-rate");
     if (sin) sin.textContent = t("calc.trm.no");
@@ -4520,171 +4694,244 @@ function setCur(c){
     return;
   }
   calc.cur = c;
-  document.getElementById("cur-cop").classList.toggle("on", c==="COP");
-  document.getElementById("cur-usd").classList.toggle("on", c==="USD");
-  /* SE NOMBRA LA FECHA Y LA FUENTE. «1 USD = $4.200 (referencia)» no se podia
-     comprobar y estaba mal; «TRM del 3 de septiembre» si, y quien quiera la
-     verifica en datos.gov.co. Si no se pudo consultar, no se muestra tasa: es la
-     misma regla del banco publico. */
+  var bc = document.getElementById("cur-cop"), bu = document.getElementById("cur-usd");
+  if (bc){ bc.classList.toggle("on", c==="COP"); bc.setAttribute("aria-pressed", c==="COP"); }
+  if (bu){ bu.classList.toggle("on", c==="USD"); bu.setAttribute("aria-pressed", c==="USD"); }
+  /* SE NOMBRA LA FECHA Y LA FUENTE de la tasa: así cualquiera la comprueba. */
   var lr = document.getElementById("calc-rate");
-  if (c !== "USD") { lr.textContent = ""; }
-  else if (TRM_INFO) {
-    lr.textContent = t("calc.trm").replace("{v}", "$" + Math.round(USD_RATE).toLocaleString("es-CO"))
-                                  .replace("{f}", TRM_INFO.desde);
-  } else {
-    lr.textContent = t("calc.trm.no");
+  if (lr){
+    if (c !== "USD") lr.textContent = "";
+    else if (TRM_INFO) lr.textContent = t("calc.trm").replace("{v}", "$" + Math.round(USD_RATE).toLocaleString("es-CO")).replace("{f}", TRM_INFO.desde);
+    else lr.textContent = t("calc.trm.no");
   }
+  CINF.sugDe = null;
+  cinfPonerMonto();
   calcUpdate();
 }
 function setFreq(f){
   calc.freq = f;
-  /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
   if (!document.getElementById("page-donar")) return;
-  document.getElementById("freq-m").classList.toggle("on", f==="m");
-  document.getElementById("freq-a").classList.toggle("on", f==="a");
-  var fu=document.getElementById("freq-u"); if(fu) fu.classList.toggle("on", f==="u");
+  ["m","a","u"].forEach(function(x){
+    var b = document.getElementById("freq-"+x);
+    if (b){ b.classList.toggle("on", f===x); b.setAttribute("aria-pressed", f===x); }
+  });
   calcUpdate();
 }
-function setCalcMode(m){
-  calc.mode = m;
+/* Persona o empresa ya no se pregunta en la calculadora: no cambiaba nada del
+   cobro (calc.mode no lo leía nadie). Se conserva por si un enlace viejo la llama. */
+function setCalcMode(m){ calc.mode = m; }
+function setQuick(cop){ calc.val = cop; CINF.err = false; CINF.aviso = ""; CINF.sugerido = 0; CINF.toco = true; cinfPonerMonto(); calcUpdate(true); }
+function syncSlider(){ cinfPonerMonto(); }
+function onSlider(){ }
+function onManual(raw){ var r = cinfLeer(raw, {}); calc.val = r.m; cinfPonerMonto(); calcUpdate(); }
+
+/* ---------- el monto: dos campos, un solo valor ----------
+   «Tu aporte» (la franja de arriba) y 02 son el MISMO monto. Convención
+   colombiana: el punto separa miles y la coma, centavos; «100,000» con comas de
+   miles también se entiende; lo ambiguo se pregunta, no se recorta. */
+function cinfCampos(){ return [document.getElementById("calc-top"), document.getElementById("calc-manual")].filter(Boolean); }
+function cinfMostrar(cop){ return cop ? cinfMiles(calc.cur === "USD" ? cop / USD_RATE : cop) : ""; }
+function cinfPonerMonto(){ var v = cinfMostrar(calc.val); cinfCampos().forEach(function(i){ i.value = v; }); cinfMedir(); }
+function cinfMedir(){
+  cinfCampos().forEach(function(i){
+    var e = i.parentNode.querySelector(".cinf-espejo"); if (!e) return;
+    e.textContent = i.value || "0";
+    i.style.width = Math.ceil(e.getBoundingClientRect().width + 4) + "px";
+  });
+}
+function cinfDigitos(s){ var d = String(s).replace(/\D/g,"").replace(/^0+/,"").slice(0,12); return d ? parseInt(d,10) : 0; }
+function cinfLeer(raw, o){
+  var s = String(raw).replace(/[\s$]|US/gi,"").toLowerCase(), m;
+  if (!s) return {m:0};
+  var w = s.match(/^(\d[\d.,]*)([a-zñó]+)$/);
+  if (w){
+    var mult = /^mil$/.test(w[2]) ? 1e3 : /^(millón|millon|millones)$/.test(w[2]) ? 1e6 : 0;
+    var base = parseFloat(w[1].replace(/\./g,"").replace(",",".")) || 0;
+    if (mult) return {m:Math.round(base*mult), fmt:true};
+    if ("millones".indexOf(w[2])===0 || "millón".indexOf(w[2])===0) return {m:cinfDigitos(w[1])};
+    return {m:0, err:true, aviso:t("calc.solonum")};
+  }
+  if (/[^\d.,]/.test(s)) return {m:0, err:true, aviso:t("calc.solonum")};
+  if (/^[\d.]+$/.test(s)){
+    if (o.pegado && /^\d+\.\d{1,2}$/.test(s)) return {m:cinfDigitos(s.split(".")[0]), fmt:true};
+    if (/\.$/.test(s) && !o.pegado) return {m:cinfDigitos(s)};
+    return {m:cinfDigitos(s), fmt:true};
+  }
+  if (/^\d{1,3}(,\d{3})+$/.test(s)) return {m:cinfDigitos(s), fmt:true};
+  var dc = s.match(/^([\d.]*),(\d{0,2})$/);
+  if (dc) return {m:cinfDigitos(dc[1])};
+  m = cinfDigitos(s);
+  return {m:0, err:true, aviso:t("calc.solonum")};
+}
+/* Reescribir con separadores sin que el cursor salte: se cuentan los dígitos a su izquierda. */
+function cinfReescribir(inp, n){
+  var v = inp.value, pos = inp.selectionStart == null ? v.length : inp.selectionStart;
+  var nuevo = n ? cinfMiles(n) : "", total = nuevo.replace(/\D/g,"").length;
+  var izq = Math.min(total, v.slice(0,pos).replace(/\D/g,"").length - (v.replace(/\D/g,"").length - total));
+  inp.value = nuevo;
+  var c = 0, i = 0;
+  if (izq > 0){ for (i=0;i<nuevo.length;i++){ if (/\d/.test(nuevo[i]) && ++c === izq){ i++; break; } } }
+  if (document.activeElement === inp){ try { inp.setSelectionRange(i,i); } catch(e){} }
+}
+function cinfConectar(){
+  cinfCampos().forEach(function(inp){
+    if (inp.getAttribute("data-cinf")) return;
+    inp.setAttribute("data-cinf","1");
+    inp.addEventListener("input", function(e){
+      var tp = e.inputType || "", borrando = /^delete/.test(tp), pegado = /paste|drop|Replacement/.test(tp);
+      var r = (borrando && /^[\d.,\s$]*$/.test(inp.value)) ? {m:cinfDigitos(inp.value), fmt:true} : cinfLeer(inp.value, {pegado:pegado});
+      CINF.err = !!r.err; CINF.aviso = r.aviso || ""; CINF.toco = true;
+      calc.val = calc.cur === "USD" ? Math.round(r.m * USD_RATE) : r.m;
+      if (r.fmt) cinfReescribir(inp, r.m);
+      cinfCampos().forEach(function(o){ if (o !== inp) o.value = inp.value; });
+      calcUpdate(true);
+    });
+    inp.addEventListener("blur", function(){ if (calc.val && !CINF.err && inp.value !== cinfMostrar(calc.val)) cinfPonerMonto(); });
+    inp.addEventListener("keydown", function(e){ if (e.key === "Enter"){ e.preventDefault(); inp.blur(); } });
+  });
+  var banda = document.getElementById("cinf-banda");
+  if (banda && window.ResizeObserver && !banda.getAttribute("data-obs")){
+    banda.setAttribute("data-obs","1");
+    new ResizeObserver(function(){ document.documentElement.style.setProperty("--cinf-banda-h", (banda.offsetHeight + 8) + "px"); }).observe(banda);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(cinfMedir);
+}
+/* Montos sugeridos: se adaptan a la unidad. Si una unidad cuesta más de $25.000,
+   1, 2 y 4 unidades; si cuesta menos, 10, 25, 50 y 100 (dentro del rango en línea). */
+function cinfPresets(d){
+  if (!d || !d.cop) return [50000,100000,250000,500000].map(function(m){ return {m:m, t:""}; });
+  var ks = d.cop > 25000 ? [1,2,4] : [10,25,50,100];
+  return ks.map(function(k){ return {m:k*d.cop, t:k+" "+cinfUnidad(d.u, k)}; })
+           .filter(function(p){ return p.m >= CINF_MIN && p.m <= CINF_MAX; });
+}
+function cinfSug(d){
+  var box = document.getElementById("calc-quick"); if (!box) return;
+  var clave = calc.projectId + "|" + calc.cur + "|" + lang;
+  if (CINF.sugDe !== clave){
+    box.innerHTML = cinfPresets(d).map(function(p){
+      return '<button type="button" data-m="'+p.m+'">'+(p.t ? '<span class="cinf-s-t">'+escapeHtml(p.t)+'</span> <span class="cinf-s-m">'+escapeHtml(cinfFmt(p.m))+'</span>'
+               : '<span class="cinf-s-t cinf-num">'+escapeHtml(cinfFmt(p.m))+'</span>') + '</button>';
+    }).join("");
+    box.onclick = function(e){ var b = e.target.closest("button[data-m]"); if (b) setQuick(parseInt(b.getAttribute("data-m"),10)); };
+    CINF.sugDe = clave;
+  }
+  box.querySelectorAll("button").forEach(function(b){ b.setAttribute("aria-pressed", (+b.getAttribute("data-m") === calc.val && !CINF.err) ? "true" : "false"); });
+}
+/* La línea del resultado: la cifra grande (elemento firma) o una frase cuando no alcanza. */
+function cinfResultado(d, m, valido){
+  var r = {tipo:"linea", n:"", u:"", linea:"", notas:[], ajustar:0, plano:""};
+  if (!valido){ r.linea = (m || CINF.err) ? t("calc.rango") : t("calc.escribe"); return r; }
+  if (!d.cop){ r.tipo = "cifra"; r.n = cinfFmt(m); r.u = d.para + "."; r.plano = r.n + " " + r.u; return r; }
+  var u = m / d.cop, ent = Math.floor(u + 1e-9);
+  var prog = d.nombre, repite = cinfUnidad(d.u,2).toLowerCase().indexOf(String(prog).toLowerCase()) >= 0;
+  var cola = (repite ? "" : " " + t("calc.para").replace("{p}", prog)) + ", " + t("calc.de").replace("{f}", d.fund) + ".";
+  if (ent < 1){
+    var p = u*100 < 1 ? t("calc.menos1") : t("calc.pct").replace("{n}", Math.floor(u*100));
+    r.linea = t("calc.parte").replace("{p}", p).replace("{u}", cinfUnidad(d.u,1)).replace("{f}", cinfFmt(d.cop - m));
+    r.plano = r.linea; r.ajustar = d.cop; return r;
+  }
+  r.tipo = "cifra"; r.n = cinfMiles(ent); r.u = cinfUnidad(d.u, ent) + cola; r.plano = r.n + " " + r.u;
+  if (m > CINF_UMBRAL){ r.notas.push(t("calc.grande")); return r; }
+  var resto = m - ent*d.cop;
+  if (resto > 0) r.notas.push(t("calc.completas").replace("{f}", cinfFmt(d.cop - resto)).replace("{n}", cinfMiles(ent+1)).replace("{u}", cinfUnidad(d.u, 2)));
+  if (calc.freq === "m") r.notas.push(t("calc.doce").replace("{n}", cinfMiles(Math.floor(u*12 + 1e-9))).replace("{u}", cinfUnidad(d.u, 2)).replace("{t}", cinfFmt(m*12)));
+  return r;
+}
+function calcUpdate(animar){
   /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
-  if (!document.getElementById("page-donar")) return;
-  var ti=document.getElementById("ctab-ind"), te=document.getElementById("ctab-emp");
-  ti.classList.toggle("on", m==="ind"); ti.setAttribute("aria-pressed", m==="ind");
-  te.classList.toggle("on", m==="emp"); te.setAttribute("aria-pressed", m==="emp");
-}
-function setQuick(cop){
-  calc.val = cop;
-  syncSlider();
-  calcUpdate();
-}
-function sliderToVal(p){
-  var minC = 5000, maxC = 20000000;
-  var v = minC * Math.pow(maxC/minC, p/100);
-  return Math.round(v/1000)*1000;
-}
-function valToSlider(cop){
-  var minC = 5000, maxC = 20000000;
-  cop = Math.max(minC, Math.min(maxC, cop));
-  return 100 * Math.log(cop/minC) / Math.log(maxC/minC);
-}
-function onSlider(p){
-  calc.val = sliderToVal(parseFloat(p));
-  calcUpdate();
-}
-function onManual(raw){
-  var n = parseInt(String(raw).replace(/[^0-9]/g,""),10) || 0;
-  if (calc.cur === "USD") n = n * USD_RATE;
-  calc.val = n;
-  syncSlider();
-  calcUpdate();
-}
-function syncSlider(){
-  var s = document.getElementById("calc-slider");
-  if (s) s.value = valToSlider(calc.val);
-}
-function calcUpdate(){
-  /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
-  if (!document.getElementById("page-donar")) return;
-  var cop = calc.val;
-  var displayN = (calc.cur === "USD") ? cop / USD_RATE : cop;
-  var disp = document.getElementById("calc-display");
-  if (disp) disp.textContent = (calc.cur === "USD") ? fmtUSD(displayN) : fmtCOP(displayN);
+  if (!document.getElementById("page-donar") || !document.getElementById("calc-ledger")) return;
+  cinfConectar();
+  var d = CALC_POR_ID[calc.projectId] || CALC_POR_ID.general || {id:"general", nombre:t("calc.dest.general"), para:t("calc.para.general")};
+  var m = calc.val, fr = calc.freq, valido = !CINF.err && m >= CINF_MIN && m <= CINF_MAX;
+  var sim = document.getElementById("calc-sim"); if (sim) sim.textContent = calc.cur === "USD" ? "US$" : "$";
+  document.querySelectorAll(".cinf-monto-b .cinf-sim").forEach(function(s){ s.textContent = calc.cur === "USD" ? "US$" : "$"; });
+  cinfMedir();
 
-  var tax = cop * 0.25;
-  var net = cop - tax;
-  var annual = (calc.freq === "m") ? cop * 12 : cop;
-
-  setText("co-tax", (calc.cur==="USD")? fmtUSD(tax/USD_RATE) : fmtCOP(tax));
-  setText("co-net", (calc.cur==="USD")? fmtUSD(net/USD_RATE) : fmtCOP(net));
-  setText("calc-annual", (calc.cur==="USD")? fmtUSD(annual/USD_RATE) : fmtCOP(annual));
-
-  /* --- estado de campaña -------------------------------------------------
-     La brigada es una operación puntual, no una membresía. Ofrecer «mensual»
-     sería cobrarle a alguien todos los meses por una emergencia de agosto, y
-     mostrarle un nivel de membresía le insinuaría beneficios del Programa de
-     Gratitud — que además es justo lo que el certificado declara que NO hay.
-     Así que la campaña fuerza aporte único y esconde el selector. */
+  /* La campaña (brigada) es una operación puntual, no una membresía: fuerza
+     aporte único y esconde la frecuencia. */
   var campana = esBrigada(calc.projectId);
-  var fq = document.getElementById("calc-freq");
-  if (fq) fq.style.display = campana ? "none" : "";
-  var cnota = document.getElementById("calc-campana-nota");
-  if (cnota){
-    cnota.style.display = campana ? "" : "none";
-    if (campana) cnota.textContent = t("calc.brigada.unico");
+  var fq = document.getElementById("calc-freq"); if (fq) fq.hidden = campana;
+  var cn = document.getElementById("calc-campana-nota");
+  if (cn){ cn.hidden = !campana; cn.textContent = campana ? t("calc.brigada.unico") : ""; }
+
+  /* Validación: el aviso sale en la franja y en 02; el botón de pagar se apaga. */
+  var txt = CINF.aviso || (m && m < CINF_MIN ? t("calc.minimo") : (m > CINF_MAX ? t("calc.maximo") : ""));
+  setText("calc-aviso", txt); setText("cinf-b-aviso", txt);
+  cinfCampos().forEach(function(i){ if (txt) i.setAttribute("aria-invalid","true"); else i.removeAttribute("aria-invalid"); });
+  var pg = document.getElementById("pay-go"); if (pg) pg.disabled = !valido;
+
+  /* La franja: frecuencia y destino en una línea (el monto está en su campo). */
+  var bt = document.getElementById("cinf-b-txt");
+  if (bt) bt.innerHTML = escapeHtml(t("calc.b."+fr)) + ' · <b>' + escapeHtml(d.cop ? t("calc.para").replace("{p}", d.nombre) : d.para) + '</b>';
+
+  /* 01 en vivo: cada línea dice lo que alcanza este monto en ese programa. */
+  document.querySelectorAll("#calc-ledger .cinf-fila").forEach(function(r){
+    var x = CALC_POR_ID[r.getAttribute("data-id")], c = r.querySelector(".cinf-alc"), h;
+    if (!x || !c) return;
+    if (!valido) h = '<span class="cinf-falta">—</span>';
+    else if (!x.cop) h = '<b>'+escapeHtml(cinfFmt(m))+'</b>';
+    else {
+      var n = Math.floor(m / x.cop + 1e-9);
+      h = n >= 1 ? '<b>'+escapeHtml(cinfMiles(n))+'</b><small>'+escapeHtml(cinfUnidad(x.u, n))+'</small>'
+                 : '<span class="cinf-falta">'+escapeHtml(t("calc.falta").replace("{f}", cinfFmt(x.cop - m)))+'</span>';
+    }
+    if (c.innerHTML !== h){ c.innerHTML = h; var b = c.querySelector("b"); if (animar && b) b.classList.add("cinf-cambia"); }
+  });
+
+  cinfSug(d);
+  var uni = document.getElementById("calc-uni");
+  if (uni) uni.innerHTML = d.cop
+    ? escapeHtml(t("calc.cada").replace("{u}", cinfUnidad(d.u,1)).replace("{c}", "\u0000")).replace("\u0000", '<b class="cinf-num">'+escapeHtml(fmtCOP(d.cop))+'</b>')
+      + " " + escapeHtml(t(d.u.verificada ? "calc.costo.verif" : "calc.costo.rep"))
+    : escapeHtml(d.sinCosto || t("calc.sincosto"));
+
+  var R = cinfResultado(d, m, valido);
+  var fi = document.getElementById("calc-firma"), fn = document.getElementById("calc-firma-n");
+  if (fi && fn){
+    fi.hidden = R.tipo !== "cifra";
+    if (R.tipo === "cifra"){
+      if (R.n !== CINF.ultimaN){
+        fn.textContent = R.n;
+        fn.style.setProperty("--len", Math.max(3, R.n.replace(/[.,]/g,"").length + (R.n.match(/[.,]/g)||[]).length*.35));
+        if (animar){ fi.classList.remove("cinf-mueve"); void fi.offsetWidth; fi.classList.add("cinf-mueve"); }
+        CINF.ultimaN = R.n;
+      }
+      setText("calc-firma-u", R.u);
+    } else CINF.ultimaN = "";
+  }
+  var fl = document.getElementById("calc-firma-linea");
+  if (fl){
+    fl.innerHTML = R.tipo === "linea" ? escapeHtml(R.linea) + (R.ajustar ? ' <button type="button" class="cinf-enlace" id="calc-ajustar">'+escapeHtml(t("calc.ajustar").replace("{m}", cinfFmt(R.ajustar)))+'</button>' : "") : "";
+    var aj = document.getElementById("calc-ajustar"); if (aj) aj.onclick = function(){ setQuick(R.ajustar); };
+  }
+  /* Sin equivalencia no se calla: la brigada dice qué se ha entregado. */
+  if (campana && valido) R.notas.push(t("calc.brigada.nota"));
+  setText("calc-firma-nota", R.notas.join(" "));
+  if (CINF.toco){ clearTimeout(CINF.tAnuncio); CINF.tAnuncio = setTimeout(function(){ setText("calc-anuncio", R.plano || R.linea); }, 600); }
+
+  var inc = document.getElementById("calc-incluye");
+  if (inc){
+    var it = d.u && d.u.incluye ? (d.u.incluye[lang] || d.u.incluye.es) : "";
+    inc.hidden = !it;
+    inc.innerHTML = it ? '<div><dt>'+escapeHtml(t("calc.incluye"))+'</dt><dd>'+escapeHtml(it)+'</dd></div>' : "";
   }
 
-  var isOnce = (calc.freq === "u");
-  var arow=document.getElementById("calc-annual-row"); if(arow) arow.style.display = isOnce ? "none" : "";
-  var mblock=document.getElementById("calc-member"); if(mblock) mblock.style.display = isOnce ? "none" : "";
-
-  var monthlyCop = (calc.freq==="a") ? cop/12 : cop;
-  var usdMonthly = monthlyCop/USD_RATE;
+  /* 03 · Resumen: la frase dice destino y aporte; las filas, solo lo que la frase no dice. */
+  var para = d.cop ? t("calc.para").replace("{p}", d.nombre) + ", " + t("calc.de").replace("{f}", d.fund) : d.para;
+  var fra = document.getElementById("calc-frase");
+  if (fra) fra.innerHTML = valido ? '<b class="cinf-num">'+escapeHtml(cinfFmt(m))+'</b>'+escapeHtml(t("calc.tf."+fr)+" "+para+".") : "";
+  var monthlyCop = (fr==="a") ? m/12 : m;
   var tier = TIERS[0];
   for (var i=0;i<TIERS.length;i++){ if (monthlyCop >= TIERS[i].min) tier = TIERS[i]; }
-  var mic=document.getElementById("m-ic"); if(mic) mic.innerHTML = tier.svg;
-  var irow=document.getElementById("co-impact-row"), iout=document.getElementById("co-impact"), inote=document.getElementById("calc-impact-note");
-  if (irow && iout){
-    var u = activeImpactUnit();
-    if (u){
-      var n = Math.floor(cop / u.cop);
-      var uSingular = (lang==="en") ? u.en : u.es;
-      var uLabel = (lang==="en") ? (n===1 ? u.en : (u.enPl||u.en)) : (n===1 ? u.es : (u.esPl||u.es));
-      var dirigida = (calc.projectId && calc.projectId!=="general");
-      if (n>=1){
-        // Alcanza al menos una unidad: conteo normal.
-        var perLbl = (calc.freq==="m") ? (lang==="en"?" per month":" al mes")
-                   : (calc.freq==="a") ? (lang==="en"?" per year":" al a\u00f1o") : "";
-        iout.textContent = "\u2248 "+n+" "+uLabel+perLbl; irow.style.display="";
-        if(inote){
-          inote.style.display="";
-          // Lectura agregada para unidades mensuales: 12 -> años, 6 -> semestres.
-          var agg = "";
-          if (u.monthly){
-            if (n>=12 && u.aggAnual){
-              var ny=Math.floor(n/12), yl=(ny===1)?(u.aggAnual[lang]||u.aggAnual.es):((u.aggAnualPl&&(u.aggAnualPl[lang]||u.aggAnualPl.es))||u.aggAnual[lang]||u.aggAnual.es);
-              agg=(lang==="en")?(" — equal to "+ny+" "+yl):(" — equivale a "+ny+" "+yl);
-            } else if (n>=6 && u.aggSemestral){
-              var ns=Math.floor(n/6), sl=(ns===1)?(u.aggSemestral[lang]||u.aggSemestral.es):((u.aggSemestralPl&&(u.aggSemestralPl[lang]||u.aggSemestralPl.es))||u.aggSemestral[lang]||u.aggSemestral.es);
-              agg=(lang==="en")?(" — equal to "+ns+" "+sl):(" — equivale a "+ns+" "+sl);
-            }
-          }
-          inote.textContent = (dirigida
-            ? ((lang==="en") ? "Directed donation: your contribution goes to this project, with records and photos."
-                             : "Donación dirigida: tu aporte va a este proyecto, con acta y foto.")
-            : t("calc.impact.note")) + agg;
-        }
-      } else if (dirigida) {
-        // No alcanza una unidad todavía: mostrar cuánto cuesta UNA completa (piso educativo).
-        iout.textContent = fmtCOP(u.cop) + ((lang==="en") ? " = 1 "+uSingular : " = 1 "+uSingular);
-        irow.style.display="";
-        if(inote){
-          inote.style.display="";
-          inote.textContent = (lang==="en")
-            ? "This is the cost of one full unit. Reach it and your donation covers a complete month."
-            : "Este es el costo de una unidad completa. Alcánzalo y tu donación cubre un mes entero.";
-        }
-      } else {
-        // Fondo general por debajo de la unidad de referencia: ocultar para no mostrar "0".
-        irow.style.display="none"; if(inote) inote.style.display="none";
-      }
-    } else {
-      irow.style.display="none";
-      /* Sin equivalencia no se calla: se explica POR QUÉ no la hay. Que falte
-         una cifra es información, y decirlo vale más que inventarla. */
-      if (inote){
-        if (campana){ inote.style.display=""; inote.textContent = t("calc.brigada.nota"); }
-        else inote.style.display="none";
-      }
-    }
-  }
-  setText("m-name", tier[lang] || tier.es);
-  /* Y esta linea imprimia dolares SIEMPRE: en pesos tambien, y sin TRM tambien,
-     que es donde no hay ninguna linea de tasa que la acompañe. Sin tasa que
-     citar, no se cita cifra: queda el nivel, que no depende del cambio. */
-  setText("m-sub", TRM_INFO
-    ? ((lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"))
-    : "");
+  var filas = "";
+  if (d.cop) filas += '<div><dt>'+escapeHtml(t("calc.r.costo"))+'</dt><dd><span class="cinf-num">'+escapeHtml(fmtCOP(d.cop))+'</span> · 1 '+escapeHtml(cinfUnidad(d.u,1))
+    + '<small>'+escapeHtml(t(d.u.verificada ? "calc.costo.verif" : "calc.costo.rep"))+'</small></dd></div>';
+  filas += '<div><dt>'+escapeHtml(t("calc.r.desc"))+'</dt><dd>'+escapeHtml(t("calc.desc.v").replace("{v}", valido ? cinfFmt(m*0.25) : "—").replace("{n}", valido ? cinfFmt(m*0.75) : "—"))+'</dd></div>';
+  if (fr === "m" && valido) filas += '<div><dt>'+escapeHtml(t("calc.r.anual"))+'</dt><dd class="cinf-num">'+escapeHtml(cinfFmt(m*12))+'</dd></div>';
+  if (fr !== "u" && !campana) filas += '<div><dt>'+escapeHtml(t("calc.r.nivel"))+'</dt><dd><span class="cinf-tier">'+tier.svg+'</span> '+escapeHtml(tier[lang] || tier.es)
+    + (TRM_INFO ? '<small>'+escapeHtml("~ " + Math.round(monthlyCop/USD_RATE) + (lang==="en" ? " USD / month" : " USD / mes"))+'</small>' : '')+'</dd></div>';
+  filas += '<div><dt>'+escapeHtml(t("calc.r.evid"))+'</dt><dd>'+escapeHtml(t(campana ? "calc.evid.brigada" : "calc.evid"))+'<small>'+escapeHtml(t("calc.guia"))+'</small></dd></div>';
+  var res = document.getElementById("calc-resumen"); if (res) res.innerHTML = filas;
   payRecNote();
 }
 function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
@@ -5035,25 +5282,83 @@ function fundRoles(p){
 }
 function fundRecibe(p){ return fundRoles(p).indexOf("recibe") >= 0; }
 function fundAporta(p){ return fundRoles(p).indexOf("aporta") >= 0; }
+/* LA RED COMO ÍNDICE (20 nov 2026). Una entrada por fundación que recibe, en
+   orden alfabético: nombre y logo (sin placa de día), la frase, la foto sin
+   nada encima, dónde y con quién, y sus programas con el costo de una unidad.
+   Cada programa abre la calculadora con ese destino (`donarA`), sin tocar el
+   monto. El filtro por tema usa el `tema` de cada unidad y, para quien no
+   publica costos, el `temas` de la fundación en partners.json. */
+var RED_FILTRO = "todos";
+function redTemas(p){
+  var x = {};
+  (p.impactUnits||[]).forEach(function(u){ if (u && u.cop && CALC_TEMAS.indexOf(u.tema) >= 0) x[u.tema] = 1; });
+  (p.temas||[]).forEach(function(tm){ if (CALC_TEMAS.indexOf(tm) >= 0) x[tm] = 1; });
+  return Object.keys(x);
+}
+function redTxt(v){ return v == null ? "" : (typeof v === "string" ? v : (v[lang] || v.es || "")); }
 function renderAliadas(){
   var el = document.getElementById("aliadas-grid"); if (!el) return;
   loadPartners().then(function(list){
+    var fs = list.filter(function(p){ return p.type === "foundation" && fundRecibe(p); })
+                 .sort(function(a,b){ return String(a.name).localeCompare(String(b.name), "es"); });
+    var temas = CALC_TEMAS.filter(function(x){ return fs.some(function(p){ return redTemas(p).indexOf(x) >= 0; }); });
+    if (RED_FILTRO !== "todos" && temas.indexOf(RED_FILTRO) < 0) RED_FILTRO = "todos";
+    cinfIndice(document.getElementById("red-ver"), temas, RED_FILTRO, "red.todas", function(x){ RED_FILTRO = x; redFiltrar(); });
     var html = "";
-    for (var i=0;i<list.length;i++){
-      var p = list[i]; if (p.type !== "foundation" || !fundRecibe(p)) continue;
-      var area = p.area ? (p.area[lang]||p.area.es||"") : "";
-      var pob = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
-      html += '<a class="pcard" href="#fundacion/'+encodeURIComponent(p.id)+'">'
-            + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '')
-            + '<span class="pcard-body"><b>'+escapeHtml(p.name)+'</b>'
-            + '<span class="mu">'+escapeHtml(pob+(pob&&area?" · ":"")+area)+'</span>'
-            + (function(){ var r=respaldo(p); return r ? '<span class="sello-mini">'+escapeHtml(t("sello.respaldo").replace("{f}", r.name))+'</span>' : ''; })()
-            + '</span>'
-            + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
-    }
-    html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
+    fs.forEach(function(p){
+      var pr = p.profile || {};
+      var logo = (p.logo && canShowLogo(p)) ? '<img class="rinf-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '';
+      var foto = "";
+      var g = (p.consent && p.consent.photos === true && p.gallery && p.gallery[0]) ? p.gallery[0] : null;
+      if (g && g.src) foto = '<figure class="rinf-fig"><div class="rinf-foto">'+(function(){ var ss = fotoSrcset(g.src); return '<img src="'+escapeHtml(g.src)+'"'+(ss ? ' srcset="'+escapeHtml(ss)+'" sizes="(max-width:720px) 100vw, 300px"' : '')+' alt="'+escapeHtml(redTxt(g.alt))+'" loading="lazy" decoding="async" width="800" height="600">'; })()+'</div>'
+        + '<figcaption>'+escapeHtml(t("red.foto").replace("{f}", p.name))+'</figcaption></figure>';
+      var us = (p.impactUnits||[]).filter(function(u){ return u && u.id && u.cop > 0; });
+      var prog;
+      if (us.length){
+        prog = '<ul class="rinf-mini">' + us.map(function(u, k){
+          return '<li data-tema="'+escapeHtml(u.tema||"")+'"'+(k >= 4 ? ' hidden' : '')+'><button type="button" data-dest="'+escapeHtml(u.id)+'">'
+            + '<span class="rinf-m-t"><b>'+escapeHtml(u.project || cinfUnidad(u,1))+'</b> <span>'+escapeHtml(cinfUnidad(u,1))+(u.verificada ? ", "+escapeHtml(t("red.verificado")) : "")+'</span></span>'
+            + '<span class="rinf-m-c">'+escapeHtml(fmtCOP(u.cop))+'<i aria-hidden="true">→</i></span><span class="sr-only"> '+escapeHtml(t("red.llevar"))+'</span></button></li>';
+        }).join("") + '</ul>'
+          + (us.length > 4 ? '<p class="rinf-mas"><button type="button" class="cinf-enlace" data-mas>'+escapeHtml(t("red.vermas").replace("{n}", us.length))+'</button></p>' : '');
+      } else {
+        var progs = (pr.programs||[]).map(function(x){ return redTxt(x && x.name); }).filter(Boolean);
+        prog = '<p class="rinf-sincosto">' + (fundAporta(p) ? '<b>'+escapeHtml(t("red.aporta.t"))+'</b> '+escapeHtml(t("red.aporta.p")) : escapeHtml(t("red.sincosto"))) + '</p>'
+          + (progs.length ? '<p class="rinf-todos">'+escapeHtml(t("red.programas") + progs.join(", "))+'.</p>' : '');
+      }
+      var area = redTxt(p.area), pob = redTxt(p.poblacion);
+      html += '<li class="rinf-ent" data-temas="'+escapeHtml(redTemas(p).join(" "))+'">'
+        + '<div class="rinf-cab"><div class="rinf-tit">'+logo+'<h3 class="rinf-nom">'+escapeHtml(p.name)+'</h3></div>'
+        + (redTxt(pr.badge) ? '<p class="rinf-ins">'+escapeHtml(redTxt(pr.badge))+'</p>' : '')
+        + (function(){ var r = respaldo(p); return r ? '<p class="rinf-ins">'+escapeHtml(t("sello.respaldo").replace("{f}", r.name))+'</p>' : ''; })()
+        + (redTxt(pr.tagline) ? '<p class="rinf-frase">'+escapeHtml(redTxt(pr.tagline))+'</p>' : '')
+        + foto + '</div>'
+        + '<div class="rinf-izq"><dl class="rinf-datos">'
+        + (area ? '<div><dt>'+escapeHtml(t("red.dnd"))+'</dt><dd>'+escapeHtml(area)+'</dd></div>' : '')
+        + (pob ? '<div><dt>'+escapeHtml(t("red.con"))+'</dt><dd>'+escapeHtml(pob)+'</dd></div>' : '')
+        + '</dl><p class="rinf-pie-ent"><a class="rinf-ficha" href="#fundacion/'+encodeURIComponent(p.id)+'">'+escapeHtml(t("red.ficha"))
+        + '<span class="sr-only"> · '+escapeHtml(p.name)+'</span> <span aria-hidden="true">→</span></a></p></div>'
+        + '<div class="rinf-prog">'+prog+'</div></li>';
+    });
     el.innerHTML = html;
+    el.onclick = function(e){
+      var mas = e.target.closest("[data-mas]");
+      if (mas){ mas.closest(".rinf-prog").querySelectorAll(".rinf-mini li[hidden]").forEach(function(l){ l.hidden = false; }); mas.parentNode.remove(); return; }
+      var b = e.target.closest("button[data-dest]"); if (b) donarA(b.getAttribute("data-dest"));
+    };
+    redFiltrar();
   });
+}
+function redFiltrar(){
+  var ver = document.getElementById("red-ver");
+  if (ver) ver.querySelectorAll("button[data-t]").forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-t")===RED_FILTRO ? "true" : "false"); });
+  var n = 0;
+  document.querySelectorAll("#aliadas-grid .rinf-ent").forEach(function(li){
+    var ok = RED_FILTRO === "todos" || (" "+li.getAttribute("data-temas")+" ").indexOf(" "+RED_FILTRO+" ") >= 0;
+    li.hidden = !ok; if (ok) n++;
+  });
+  var v = document.getElementById("red-vacio");
+  if (v){ v.hidden = n > 0; v.textContent = n ? "" : t("red.vacio"); }
 }
 /* Las fundaciones EN LA PORTADA. Misma fuente que el muro del HUB
    —`partners.json` vía `loadPartners()`— y la misma regla de consentimiento,
@@ -5985,11 +6290,10 @@ function init(){
   var qDest = (new URLSearchParams(location.search).get("d") || "").trim();
   if (qDest){
     setTimeout(function(){
-      var sel = document.getElementById("calc-project");
-      if (!sel) return;
-      for (var i=0;i<sel.options.length;i++){
-        if (sel.options[i].value === qDest){ sel.value = qDest; setProject(qDest); break; }
-      }
+      loadPartners().then(function(){
+        try { buildProjectSelect(); } catch(e){}
+        if (CALC_POR_ID[qDest]){ CINF.plegado = true; setProject(qDest); }
+      });
     }, 0);
     hash = "donar";
   }
