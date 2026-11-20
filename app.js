@@ -2576,6 +2576,34 @@ var I18N = {
     "rg.via.l":"¿Cómo quieres pagar?",
     "rg.via.cop":"En pesos colombianos, con Wompi",
     "rg.via.usd":"En dólares, a través de nuestra fundación aliada en Estados Unidos",
+    "rg.via.banco":"Directamente al banco de Give&Grow, desde Colombia o desde el exterior",
+    "rg.via.paypal":"Moneda internacional, con PayPal (se cobra en dólares)",
+    "rg.via.n.banco":"Te mostramos los datos de la cuenta y tu número de pedido, que va en el concepto. Apartamos tus regalos 72 horas y confirmamos cada transferencia contra el extracto del banco antes de darlos por financiados.",
+    "rg.via.n.paypal":"Pagas en PayPal con tu cuenta o con tarjeta, en dólares: PayPal o tu banco convierten desde coronas, euros o la moneda que uses. El pago lleva tu número de pedido y se confirma solo.",
+    "rg.banco.t":"Tus regalos quedaron apartados por 72 horas.",
+    "rg.banco.p":"Transfiere {cop} a esta cuenta y escribe {ref} en el concepto. Te enviamos estos mismos datos a tu correo. Los regalos quedan financiados cuando confirmamos tu transferencia contra el extracto del banco.",
+    "rg.banco.ext":"Desde fuera de Colombia: usa el código SWIFT. Tu banco convierte el dinero a pesos y puede cobrar sus propios costos; como referencia, el pedido vale {usd}.",
+    "rg.banco.banco":"Banco",
+    "rg.banco.cuenta":"Cuenta de ahorros",
+    "rg.banco.titular":"Titular",
+    "rg.banco.concepto":"Concepto",
+    "rg.banco.valor":"Valor",
+    "rg.banco.dirb":"Dirección del banco",
+    "rg.banco.dirt":"Dirección del titular",
+    "rg.banco.copiar":"Copiar",
+    "rg.banco.copiado":"Copiado",
+    "rg.banco.comp":"¿Ya transferiste? Sube el comprobante (opcional)",
+    "rg.banco.comp.ayuda":"Imagen o PDF, hasta 5 MB. Nos ayuda a encontrar tu transferencia más rápido.",
+    "rg.banco.comp.ok":"Recibimos tu comprobante. Gracias.",
+    "rg.banco.comp.mal":"No pudimos subir el comprobante. Revisa que sea una imagen o un PDF de menos de 5 MB.",
+    "rg.pp.capturando":"Confirmando tu pago con PayPal…",
+    "rg.pp.ok":"PayPal confirmó tu pago. Tus regalos quedaron financiados.",
+    "rg.pp.cancelado":"Cancelaste en PayPal y no se hizo ningún cobro. Tus regalos se liberan en menos de una hora; si quieres, vuelve a escogerlos y paga por el camino que prefieras.",
+    "rg.pp.mal":"PayPal todavía no confirma el pago. Si ya pagaste, en unos minutos se refleja aquí solo.",
+    "rg.e.paypal":"PayPal no respondió. Tus regalos no quedaron apartados: inténtalo de nuevo en un momento.",
+    "rg.seg.canal":"Cómo pagas",
+    "rg.seg.c.banco":"Transferencia al banco",
+    "rg.seg.c.paypal":"PayPal",
     "rg.f.nombre":"Tu nombre",
     "rg.f.email":"Tu correo",
     "rg.f.tel":"Tu teléfono (opcional)",
@@ -3767,7 +3795,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "e802e7f7", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "735e59c7", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -3911,7 +3939,7 @@ var ACT_DIFERIDAS = {
   closeLightbox:"impacto", lbStep:"impacto",
   rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
   rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
-  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos",
+  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos", rgCopiar:"regalos", rgComprobante:"regalos",
   apuCalcula:"apadrinamiento", apuInteres:"apadrinamiento"
 };
 function runAct(spec, el, ev){

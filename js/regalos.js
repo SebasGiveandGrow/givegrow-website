@@ -58,7 +58,9 @@ function rgGuardaLista(){
 function rgEsc(s){ return escapeHtml(s == null ? "" : String(s)); }
 function rgCOP(n){ return "$" + Number(n || 0).toLocaleString("es-CO"); }
 function rgUSD(n){ return "US$" + Number(n || 0).toLocaleString("en-US"); }
-function rgValor(r){ return RG.via === "usd" ? rgUSD(r.valor_usd) : rgCOP(r.valor_cop); }
+/* La moneda que ve el donante: dólares con la aliada o con PayPal (0070). */
+function rgEnUsd(){ return RG.via === "usd" || RG.via === "paypal"; }
+function rgValor(r){ return rgEnUsd() ? rgUSD(r.valor_usd) : rgCOP(r.valor_cop); }
 function rgEdad(n){ return t(n === 1 ? "rg.anio" : "rg.anios").replace("{n}", n); }
 function rgZona(id){
   var z = (RG.datos && RG.datos.zonas || []).filter(function(x){ return x.id === id; })[0];
@@ -89,7 +91,9 @@ function rgNombreTipo(k){ return lang === "sv" && RG_TIPO_SV[k.id] ? RG_TIPO_SV[
 function rgEntrar(){
   var q = new URLSearchParams(location.search);
   var ref = q.get("rg"), tk = q.get("rt");
-  if (ref && tk) rgSeguimiento(ref, tk);
+  /* De vuelta de PayPal (0070): primero capturar, después el seguimiento. */
+  if (ref && tk && q.get("pp") === "1" && !RG.ppVisto) { RG.ppVisto = true; rgPaypalVuelta(ref, tk, q.get("cancelado") === "1"); }
+  else if (ref && tk) rgSeguimiento(ref, tk);
   /* El enlace de un embajador (?emb=, migración 0051): se recuerda en esta
      pestaña hasta pagar, aunque la persona navegue por el sitio antes. El
      servidor decide si el código vale; aquí solo se limpia la forma. */
@@ -468,8 +472,8 @@ function rgElegidos(){
 }
 function rgTotal(sel){
   var s = 0;
-  sel.forEach(function(r){ s += Number(RG.via === "usd" ? r.valor_usd : r.valor_cop) || 0; });
-  return RG.via === "usd" ? rgUSD(s) : rgCOP(s);
+  sel.forEach(function(r){ s += Number(rgEnUsd() ? r.valor_usd : r.valor_cop) || 0; });
+  return rgEnUsd() ? rgUSD(s) : rgCOP(s);
 }
 
 function rgPintaLista(){
@@ -488,18 +492,21 @@ function rgPintaLista(){
   }).join("");
   rgEl("rg-total").textContent = rgTotal(sel);
   /* La vía en dólares existe solo si /admin/regalos tiene la aliada configurada. */
-  var usd = rgEl("rg-via-usd");
-  if (usd) usd.hidden = !c.usd;
-  if (!c.usd && RG.via === "usd") RG.via = "cop";
+  var hay = { cop: true, usd: !!c.usd, banco: !!c.banco, paypal: !!c.paypal };
+  ["usd", "banco", "paypal"].forEach(function(v){ var l = rgEl("rg-via-" + v); if (l) l.hidden = !hay[v]; });
+  if (!hay[RG.via]) RG.via = "cop";
   Array.prototype.forEach.call(document.querySelectorAll('input[name="rg-via"]'), function(x){ x.checked = x.value === RG.via; });
-  rgEl("rg-cert-caja").hidden = RG.via !== "cop";
+  var vn = rgEl("rg-via-nota");
+  if (vn) { vn.hidden = RG.via !== "banco" && RG.via !== "paypal"; vn.textContent = vn.hidden ? "" : t("rg.via.n." + RG.via); }
+  /* El certificado colombiano es para lo que entra en pesos: Wompi o el banco. */
+  rgEl("rg-cert-caja").hidden = RG.via !== "cop" && RG.via !== "banco";
   var nota = rgEl("rg-cert-usd");
   nota.hidden = RG.via !== "usd";
   nota.textContent = c.aliada_nombre ? t("rg.cert.usd").replace("{a}", c.aliada_nombre) : "";
 }
 
 function rgVia(v){
-  RG.via = v === "usd" ? "usd" : "cop";
+  RG.via = ["usd", "banco", "paypal"].indexOf(v) >= 0 ? v : "cop";
   RG.viaElegida = true;
   rgPintaGrid();
   rgPintaLista();
@@ -524,7 +531,7 @@ function rgPagar(ev){
   var nombre = rgEl("rg-nombre").value.trim(), email = rgEl("rg-email").value.trim();
   if (nombre.length < 2) { allyMal(note, "rg-nombre", "rg.e.nombre"); return false; }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { allyMal(note, "rg-email", "rg.e.email"); return false; }
-  var cert = RG.via === "cop" && rgEl("rg-cert").checked;
+  var cert = (RG.via === "cop" || RG.via === "banco") && rgEl("rg-cert").checked;
   if (cert && (rgEl("rg-docnum").value.trim().length < 3 || rgEl("rg-ciudad").value.trim().length < 2)) {
     allyMal(note, rgEl("rg-docnum").value.trim().length < 3 ? "rg-docnum" : "rg-ciudad", "rg.e.cert"); return false;
   }
@@ -546,6 +553,13 @@ function rgPagar(ev){
     .then(function(d){
       RG.lista = []; rgGuardaLista();
       var sigue = function(){
+        if (d.canal === "banco") { RG.enviando = false; btn.disabled = false; rgPintaBanco(d); return; }
+        if (d.canal === "paypal") {
+          /* PayPal no abre dentro de un marco: se va en la pestaña de arriba. */
+          if (RG.incrustado) { try { window.top.location.href = d.url; return; } catch (e) {} RG.enviando = false; btn.disabled = false; rgPintaPagoNuevaPestana(d); return; }
+          window.location.href = d.url;
+          return;
+        }
         if (d.via === "cop") {
           try { sessionStorage.setItem("gg_guia", d.guia); } catch (e) {}
           /* Dentro de un marco la pasarela no abre: un clic más, en otra pestaña. */
@@ -583,7 +597,8 @@ function rgPagar(ev){
       }
       var clave = { campana_cerrada: "rg.e.cerrada", demasiados_regalos: "rg.e.muchos", monto_invalido: "rg.e.monto",
         demasiados_intentos: "rg.e.intentos", certificado_datos_invalidos: "rg.e.cert", correo_invalido: "rg.e.email",
-        usd_no_disponible: "rg.e.usd", pasarela_no_configurada: "rg.e.pasarela" }[c] || "rg.e.red";
+        usd_no_disponible: "rg.e.usd", pasarela_no_configurada: "rg.e.pasarela",
+        paypal_fallo: "rg.e.paypal", paypal_no_configurado: "rg.e.paypal" }[c] || "rg.e.red";
       allyMsg(note, t(clave), false);
     });
   return false;
@@ -612,6 +627,62 @@ function rgPintaUsd(d){
       rgEsc(enCasa ? t("rg.usd.pagar").replace("{usd}", rgUSD(d.total_usd)) : t("rg.usd.ir").replace("{a}", d.aliada)) + '</a> ' +
     '<a class="btn btn-o" href="' + rgEsc(d.seguimiento) + '"' + (RG.incrustado ? ' target="_blank" rel="noopener"' : '') + '>' + rgEsc(t("rg.seg.ir")) + '</a></p>';
   s.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+/* LA TRANSFERENCIA DIRECTA (0070): los datos de la cuenta aparecen solo aquí,
+   con el número del pedido, que es lo que va en el concepto. */
+function rgBancoHtml(b, ref, cop, usd){
+  var fila = function(k, v, copiar){ return '<div class="rec-item"><dt>' + rgEsc(k) + '</dt><dd>' + rgEsc(v) +
+    (copiar ? ' <button type="button" class="copy" data-act="rgCopiar(this)" data-v="' + rgEsc(v) + '">' + rgEsc(t("rg.banco.copiar")) + '</button>' : '') + '</dd></div>'; };
+  return '<dl class="rec-list rg-banco">' +
+    fila(t("rg.banco.concepto"), ref, true) + fila(t("rg.banco.valor"), cop + " COP", false) +
+    fila(t("rg.banco.banco"), b.banco, false) + fila(t("rg.banco.cuenta"), b.numero, true) +
+    fila(t("rg.banco.titular"), b.titular, false) + fila("NIT", b.nit, false) +
+    fila("SWIFT", b.swift, true) + fila(t("rg.banco.dirb"), b.banco_dir, false) + fila(t("rg.banco.dirt"), b.titular_dir, false) +
+    '</dl><p class="rg-ayuda">' + rgEsc(t("rg.banco.ext").replace("{usd}", usd)) + '</p>';
+}
+function rgCompHtml(url){
+  return '<div class="field rg-comp"><label for="rg-comp-f">' + rgEsc(t("rg.banco.comp")) + '</label>' +
+    '<input type="file" id="rg-comp-f" accept="image/jpeg,image/png,image/webp,application/pdf" data-url="' + rgEsc(url) + '" data-change="rgComprobante(this)">' +
+    '<p class="rg-ayuda" id="rg-comp-m" aria-live="polite">' + rgEsc(t("rg.banco.comp.ayuda")) + '</p></div>';
+}
+function rgCopiar(btn){
+  var v = btn.getAttribute("data-v");
+  try { navigator.clipboard.writeText(v).then(function(){ btn.textContent = t("rg.banco.copiado"); }); } catch (e) {}
+}
+function rgComprobante(input){
+  var f = input.files && input.files[0], m = rgEl("rg-comp-m");
+  if (!f) return;
+  if (f.size > 5 * 1048576) { m.textContent = t("rg.banco.comp.mal"); return; }
+  input.disabled = true;
+  fetch(input.getAttribute("data-url"), { method: "POST", headers: { "content-type": f.type }, body: f })
+    .then(function(r){ if (!r.ok) throw new Error("http_" + r.status); m.textContent = t("rg.banco.comp.ok"); })
+    .catch(function(){ input.disabled = false; m.textContent = t("rg.banco.comp.mal"); });
+}
+function rgPintaBanco(d){
+  rgEl("rg-pagar").hidden = true;
+  rgEl("rg-barra").hidden = true;
+  var s = rgEl("rg-usd");
+  s.hidden = false;
+  rgEl("rg-usd-ok").innerHTML =
+    '<p class="rg-usd-t">' + rgEsc(t("rg.banco.t")) + '</p>' +
+    '<p>' + rgEsc(t("rg.banco.p").replace("{cop}", rgCOP(d.total_cop)).replace("{ref}", d.ref)) + '</p>' +
+    '<p class="rg-ref">' + rgEsc(d.ref) + '</p>' +
+    rgBancoHtml(d.banco, d.ref, rgCOP(d.total_cop), rgUSD(d.total_usd)) +
+    rgCompHtml("/api/comprobante/" + encodeURIComponent(d.guia) + "?t=" + encodeURIComponent(d.aporte_token)) +
+    '<p class="rg-usd-acc"><a class="btn btn-o" href="' + rgEsc(d.seguimiento) + '"' + (RG.incrustado ? ' target="_blank" rel="noopener"' : '') + '>' + rgEsc(t("rg.seg.ir")) + '</a></p>';
+  s.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+/* De vuelta de PayPal. Capturar es lo que cobra: hasta aquí, PayPal solo
+   tenía la aprobación. Si se canceló, no se toca nada. */
+function rgPaypalVuelta(ref, tk, cancelado){
+  var sec = rgEl("rg-seguimiento"), cuerpo = rgEl("rg-seg-cuerpo");
+  if (sec) { sec.hidden = false; sec.scrollIntoView({ block: "start" }); }
+  if (cancelado) { RG.ppAviso = t("rg.pp.cancelado"); rgSeguimiento(ref, tk); return; }
+  if (cuerpo) cuerpo.textContent = t("rg.pp.capturando");
+  fetch("/api/regalos/pedido/" + encodeURIComponent(ref) + "/paypal?t=" + encodeURIComponent(tk), { method: "POST" })
+    .then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(j){ RG.ppAviso = t(j && j.ok ? "rg.pp.ok" : "rg.pp.mal"); rgSeguimiento(ref, tk); })
+    .catch(function(){ RG.ppAviso = t("rg.pp.mal"); rgSeguimiento(ref, tk); });
 }
 function rgPintaPagoNuevaPestana(d){
   rgEl("rg-pagar").hidden = true;
@@ -705,7 +776,7 @@ function rgSeguimiento(ref, tk){
          ahí una sola vez, no en cada consulta de las que siguen. */
       if (!RG.segVisto) { RG.segVisto = true; sec.scrollIntoView({ block: "start" }); }
       /* Recién vuelto de pagar, el webhook puede tardar unos segundos. */
-      if (d.estado === "pendiente" && d.via === "cop" && (RG.segIntentos || 0) < 8) {
+      if (d.estado === "pendiente" && d.via === "cop" && !d.canal && (RG.segIntentos || 0) < 8) {
         RG.segIntentos = (RG.segIntentos || 0) + 1;
         setTimeout(function(){ if (currentRoute === "regalos") rgSeguimiento(ref, tk); }, 4000);
       }
@@ -717,13 +788,17 @@ function rgPintaSeg(){
   var d = RG.seg.d, cuerpo = rgEl("rg-seg-cuerpo");
   var estado = d.estado === "pendiente" && d.pago === "rechazada" ? "fallido" : d.estado;
   var total = d.via === "usd" ? rgUSD(d.total_usd) : rgCOP(d.total_cop);
-  var cab = '<dl class="rec-list rg-seg-cab">' +
+  var aviso = RG.ppAviso ? '<p class="rg-usd-t">' + rgEsc(RG.ppAviso) + '</p>' : '';
+  var cab = aviso + '<dl class="rec-list rg-seg-cab">' +
     '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.pedido")) + '</dt><dd>' + rgEsc(d.ref) + '</dd></div>' +
     '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.estado")) + '</dt><dd>' + rgEsc(t("rg.pe." + estado)) + '</dd></div>' +
     '<div class="rec-item"><dt>' + rgEsc(t("rg.total")) + '</dt><dd>' + rgEsc(total) + '</dd></div>' +
     (d.guia ? '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.guia")) + '</dt><dd><a href="/?g=' + encodeURIComponent(d.guia) + '#rastrea">' + rgEsc(d.guia) + '</a></dd></div>' : '') +
     (d.aliada ? '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.aliada")) + '</dt><dd>' + rgEsc(d.aliada) + '</dd></div>' : '') +
+    (d.canal ? '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.canal")) + '</dt><dd>' + rgEsc(t("rg.seg.c." + d.canal)) + '</dd></div>' : '') +
     '</dl>' +
+    (d.banco ? rgBancoHtml(d.banco, d.ref, rgCOP(d.total_cop), rgUSD(d.total_usd)) : '') +
+    (d.comprobante && !d.comprobante.subido ? rgCompHtml(d.comprobante.url) : '') +
     (d.aliada_url ? '<p><a class="btn btn-g" href="' + rgEsc(d.aliada_url) + '" target="_blank" rel="noopener">' + rgEsc(t("rg.usd.ir").replace("{a}", d.aliada)) + '</a></p>' : '');
   var items = (d.items || []).map(function(it){
     var nota = "";

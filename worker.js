@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "119e0632";
+const STYLES_V = "59a6274f";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -3311,6 +3311,23 @@ const REGALOS_RESERVA_PENDIENTE_H = 48;
 const REGALOS_RESERVA_USD_H = 72;
 const RE_CODIGO_REGALO = /^[A-Z]{3}-\d{4}$/;
 const RE_PEDIDO_REGALO = /^RG-\d{4}-\d{6}$/;
+/* LOS DOS CAMINOS DEL 19 NOV 2026 (0070), pedidos por Sebas antes de enviar la
+   página a Suecia, donde no hay nadie de Give&Grow que responda por el dinero.
+   Por eso los dos dejan rastro completo y ninguno da un regalo por pagado sin
+   prueba: la transferencia entra a la bandeja que se contrasta contra el
+   extracto; PayPal se confirma solo con la captura, que trae el número RG. */
+const REGALOS_RESERVA_PAYPAL_MIN = 60;
+/* La cuenta es la que ya publica /donar y la que cita el certificado
+   (`ENTIDAD` en documentos.js). El SWIFT y las direcciones son lo que pide un
+   banco extranjero para girar a Colombia. Solo se muestran DESPUÉS de crear el
+   pedido, junto al número RG que va en el concepto. */
+const REGALOS_BANCO = {
+  banco: "Bancolombia", numero: "31000009221",
+  tipo_es: "Cuenta de ahorros", tipo_en: "Savings account",
+  titular: "Fundación Give&Grow International", nit: "901.948.930-2",
+  swift: "COLOCOBM", banco_dir: "Bancolombia S.A., Medellín, Colombia",
+  titular_dir: "Carrera 82 A # 9 A Sur 28, Medellín, Colombia"
+};
 
 /* Un regalo se puede escoger si está publicado y no lo tiene apartado nadie. */
 /* Lo que hace falta para mostrar a un niño en público: la autorización del
@@ -3378,7 +3395,7 @@ async function apiRegalos(env) {
 
   const campana = {
     id: c.id, nombre_es: c.nombre_es, nombre_en: c.nombre_en, estado: c.estado, cierre: c.cierre,
-    recibe: regalosRecibe(c), aliada_nombre: c.aliada_nombre || null, usd: !!(c.aliada_nombre && c.aliada_url),
+    recibe: regalosRecibe(c), aliada_nombre: c.aliada_nombre || null, usd: !!(c.aliada_nombre && c.aliada_url), paypal: !!paypalConfig(env), banco: true,
     /* Cuántos días quedan para donar, contados en Colombia: 0 = hoy es el
        último. Lo calcula el servidor para no depender del reloj de quien mira. */
     quedan_dias: regalosRecibe(c) && c.cierre
@@ -3479,8 +3496,13 @@ async function apiRegalosPedido(request, env, url) {
   const campana = await regalosCampana(env);
   if (!regalosRecibe(campana)) return json({ error: "campana_cerrada" }, 409);
 
-  const via = c.via === "usd" ? "usd" : "cop";
-  if (via === "usd" && !(campana.aliada_nombre && campana.aliada_url)) {
+  /* `via` es la moneda y `canal` el camino (0070): banco = pesos sin Wompi,
+     paypal = dólares sin la aliada. */
+  const canal = c.via === "banco" ? "banco" : c.via === "paypal" ? "paypal" : null;
+  const via = c.via === "usd" || canal === "paypal" ? "usd" : "cop";
+  const ppCfg = canal === "paypal" ? paypalConfig(env) : null;
+  if (canal === "paypal" && !ppCfg) return json({ error: "paypal_no_configurado" }, 503);
+  if (via === "usd" && !canal && !(campana.aliada_nombre && campana.aliada_url)) {
     return json({ error: "usd_no_disponible" }, 409);
   }
 
@@ -3525,7 +3547,7 @@ async function apiRegalosPedido(request, env, url) {
     } catch (e) { console.error("embajador", e && e.message); }
   }
 
-  if (via === "cop" && !(env.WOMPI_PUBLIC_KEY && env.WOMPI_INTEGRITY_SECRET)) {
+  if (via === "cop" && !canal && !(env.WOMPI_PUBLIC_KEY && env.WOMPI_INTEGRITY_SECRET)) {
     return json({ error: "pasarela_no_configurada" }, 503);
   }
 
@@ -3557,7 +3579,11 @@ async function apiRegalosPedido(request, env, url) {
 
   const ref = await siguientePedidoRegalo(env, anioCO());
   const token = tokenNuevo();
-  const plazo = via === "usd" ? "+" + REGALOS_RESERVA_USD_H + " hours" : "+" + REGALOS_RESERVA_MIN + " minutes";
+  /* La transferencia tarda lo que tarda un banco, y más si viene de afuera:
+     72 h, como la aliada. PayPal es inmediato: una hora para aprobar. */
+  const plazo = canal === "paypal" ? "+" + REGALOS_RESERVA_PAYPAL_MIN + " minutes"
+    : via === "usd" || canal === "banco" ? "+" + REGALOS_RESERVA_USD_H + " hours"
+    : "+" + REGALOS_RESERVA_MIN + " minutes";
 
   await env.DB.batch(filas.map((f) => env.DB.prepare(
     "UPDATE regalos AS r SET reserva_ref = ?, reservado_hasta = datetime('now', ?), " +
@@ -3573,9 +3599,9 @@ async function apiRegalosPedido(request, env, url) {
   }
 
   const lote = [env.DB.prepare(
-    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, total_cop, total_usd, nombre, email, telefono, idioma" +
-    (embajador ? ", embajador" : "") + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (embajador ? ", ?" : "") + ")"
-  ).bind(ref, REGALOS_CAMPANA, token, via, totalCop, totalUsd, nombre, email, telefono, idioma, ...(embajador ? [embajador] : []))];
+    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, canal, total_cop, total_usd, nombre, email, telefono, idioma" +
+    (embajador ? ", embajador" : "") + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (embajador ? ", ?" : "") + ")"
+  ).bind(ref, REGALOS_CAMPANA, token, via, canal, totalCop, totalUsd, nombre, email, telefono, idioma, ...(embajador ? [embajador] : []))];
   for (const f of filas) {
     lote.push(env.DB.prepare(
       "INSERT INTO regalo_pedido_items (pedido_ref, regalo_id, valor_cop, valor_usd) VALUES (?, ?, ?, ?)"
@@ -3583,7 +3609,7 @@ async function apiRegalosPedido(request, env, url) {
   }
   lote.push(env.DB.prepare(
     "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'pedido', ?, 'sistema')"
-  ).bind(ref, via + " · " + codigos.join(", ")));
+  ).bind(ref, (canal || via) + " · " + codigos.join(", ")));
   await env.DB.batch(lote);
   /* La carta y la autorización de noticias no pueden tumbar el pedido. */
   try {
@@ -3592,6 +3618,30 @@ async function apiRegalosPedido(request, env, url) {
   } catch (e) { console.error("carta o noticias", ref, e && e.message); }
 
   const seguimiento = enlaceSeguimientoRegalos(ref, token);
+
+  if (canal === "paypal") {
+    const r = await regalosPaypalCrear(env, url, ppCfg, { ref, token, idioma, totalUsd, n: codigos.length });
+    if (!r) {
+      /* Sin pedido en PayPal no hay a dónde ir: se suelta todo, para que el
+         regalo no quede apartado una hora por un fallo ajeno. */
+      await regalosSoltarPedido(env, ref, "fallido", "paypal");
+      return json({ error: "paypal_fallo" }, 502);
+    }
+    return json({ ref, token, via, canal, url: r, seguimiento, total_usd: totalUsd });
+  }
+
+  if (canal === "banco") {
+    let b;
+    try { b = await regalosBancoAporte(env, { ref, nombre, email, telefono, idioma, totalCop, quiereCert, muro, certDatos, codigos }); }
+    catch (e) {
+      /* Sin aporte no hay nada que verificar contra el extracto: se suelta. */
+      console.error("pedido banco", ref, e && e.message);
+      await regalosSoltarPedido(env, ref, "fallido", "banco");
+      return json({ error: "error_interno" }, 500);
+    }
+    return json({ ref, token, via, canal, guia: b.guia, aporte_token: b.token, seguimiento,
+      total_cop: totalCop, total_usd: totalUsd, banco: REGALOS_BANCO, reserva_h: REGALOS_RESERVA_USD_H });
+  }
 
   if (via === "usd") {
     const destino = urlAliada(campana.aliada_url, ref, totalUsd);
@@ -3617,16 +3667,187 @@ async function apiRegalosPedido(request, env, url) {
   return json({ ref, token, via, guia, url: pago.url, modo: pago.modo, seguimiento, total_cop: totalCop });
 }
 
+/* LA TRANSFERENCIA DIRECTA (0070). El aporte nace `reportada` y con eso entra a
+   la bandeja «Transferencias por verificar», que es el único lugar donde una
+   transferencia se da por recibida: una persona la contrasta contra el
+   extracto, escribe la referencia, la fecha y el monto que entró, y queda su
+   nombre en la auditoría. Al confirmarla, `adminConfirmarTransferencia` llama
+   a `regalosTrasAporte` y los regalos quedan financiados; al descartarla, se
+   sueltan. Si nunca llega, la reserva vence sola a las 72 h.
+
+   Entra como `reportada` aunque el donante todavía no haya transferido, y la
+   nota lo dice: así la bandeja la muestra desde el primer minuto, con su edad,
+   y no se pierde un pedido que nadie vio. */
+async function regalosBancoAporte(env, x) {
+  const donanteId = await donantePorCorreo(env, x.email, x.nombre, x.telefono);
+  const guia = await siguienteGuia(env, anioCO());
+  const token = tokenNuevo();
+  const en = x.idioma === "en";
+  await env.DB.prepare(
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
+    "frecuencia, quiere_certificado, consent_muro, nota, idioma, token, donante_id, metodo_pago, " +
+    "referencia_pago, fecha_pago, certificado_datos) " +
+    "VALUES (?, 'reportada', ?, 'COP', 'fondo', NULL, ?, 'unico', ?, ?, ?, ?, ?, ?, 'TRANSFERENCIA', ?, ?, ?)"
+  ).bind(guia, x.totalCop * 100, (en ? "December gifts · " : "Regalos de diciembre · ") + x.ref,
+         x.quiereCert, x.muro,
+         "Pedido de regalos " + x.ref + ": eligió pagar directamente al banco. Puede venir del exterior " +
+         "(llega en pesos tras el cambio, con otro monto: confírmalo con lo que entró).",
+         x.idioma, token, donanteId, x.ref, fechaCO(new Date().toISOString()), x.certDatos).run();
+  await env.DB.prepare("UPDATE regalo_pedidos SET guia = ? WHERE ref = ?").bind(guia, x.ref).run();
+  await anotarAutorizacion(env, guia, "transferencia_reportada",
+                           "pedido de regalos " + x.ref + " · $" + x.totalCop + " COP", "aporte");
+  try {
+    await correoRegalosPedidoBanco(env, { ref: x.ref, guia, nombre: x.nombre, email: x.email,
+      idioma: x.idioma, totalCop: x.totalCop, n: x.codigos.length });
+    await correoAvisoTransferencia(env, { guia, monto: x.totalCop, email: x.email, nombre: x.nombre,
+      telefono: x.telefono, fecha: fechaCO(new Date().toISOString()) + " (pedido; aún sin transferir)", refer: x.ref,
+      destino: "Regalos de diciembre · " + x.ref });
+  } catch (e) { console.error("correo pedido banco", x.ref, e && e.message); }
+  return { guia, token };
+}
+
+async function correoRegalosPedidoBanco(env, x) {
+  const en = x.idioma === "en", B = REGALOS_BANCO;
+  const titulo = (en ? "Your gift order " : "Tu pedido de regalos ") + x.ref;
+  const parrafos = en ? [
+    "Hi " + x.nombre + ",",
+    "We are holding your " + x.n + " gift(s) for " + REGALOS_RESERVA_USD_H + " hours while you make the bank transfer.",
+    "Write " + x.ref + " in the transfer reference, so we can match it. From outside Colombia, use the SWIFT code: your bank converts the money to Colombian pesos and may charge its own fees.",
+    "We confirm every transfer against our bank statement. Then your gifts show as funded and your receipt (" + x.guia + ") reaches you."
+  ] : [
+    "Hola, " + x.nombre + ":",
+    "Apartamos tus " + x.n + " regalo(s) por " + REGALOS_RESERVA_USD_H + " horas mientras haces la transferencia.",
+    "Escribe " + x.ref + " en el concepto o la referencia de la transferencia: así la asociamos a tus regalos. Desde fuera de Colombia, usa el código SWIFT: tu banco convierte el dinero a pesos colombianos y puede cobrar sus propios costos.",
+    "Confirmamos cada transferencia contra el extracto del banco. Entonces tus regalos quedan financiados y te llega tu recibo (" + x.guia + ")."
+  ];
+  const filas = [
+    [en ? "Order (reference)" : "Pedido (concepto)", x.ref],
+    [en ? "Amount" : "Valor", fmtPesos(x.totalCop * 100) + " COP"],
+    [en ? "Bank" : "Banco", B.banco], [en ? B.tipo_en : B.tipo_es, B.numero],
+    [en ? "Account holder" : "Titular", B.titular], ["NIT", B.nit], ["SWIFT", B.swift],
+    [en ? "Bank address" : "Dirección del banco", B.banco_dir],
+    [en ? "Holder address" : "Dirección del titular", B.titular_dir]
+  ];
+  const enlace = enlaceSeguimientoRegalos(x.ref, (await env.DB.prepare("SELECT token FROM regalo_pedidos WHERE ref = ?").bind(x.ref).first()).token);
+  await enviarCorreo(env, {
+    para: x.email, asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", ...filas.map(([k, v]) => k + ": " + v), "", (en ? "Follow: " : "Seguimiento: ") + enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas,
+      boton: { url: enlace, texto: en ? "Follow your gifts" : "Sigue tus regalos" },
+      cierre: en ? "This is an automatic message from Fundación Give&Grow International." : "Este mensaje es automático." }),
+    etiqueta: "regalos-pedido-banco", guia: x.ref
+  });
+}
+
+/* PAYPAL CON NÚMERO (0070). El botón alojado es ciego —no acepta referencia
+   por donante—, así que aquí se usa la API de pedidos: el Worker crea el
+   pedido con el RG en `custom_id` e `invoice_id`, el donante aprueba en
+   PayPal y vuelve a /regalos, y el Worker captura. Si el donante cierra la
+   pestaña antes de volver, PayPal no cobra (un pedido sin capturar no es un
+   pago); y si la captura ocurre y la respuesta se pierde, el webhook
+   PAYMENT.CAPTURE.COMPLETED trae el mismo RG y termina el trabajo. */
+async function regalosPaypalCrear(env, url, cfg, x) {
+  try {
+    const tk = await paypalToken(cfg);
+    const en = x.idioma === "en";
+    const volver = url.origin + "/regalos?rg=" + encodeURIComponent(x.ref) + "&rt=" + encodeURIComponent(x.token) + "&pp=1";
+    const r = await paypalPost(cfg, tk, "/v2/checkout/orders", {
+      intent: "CAPTURE",
+      purchase_units: [{
+        reference_id: x.ref, custom_id: x.ref, invoice_id: x.ref,
+        description: (en ? "December gifts · " : "Regalos de diciembre · ") + x.n + (en ? " gift(s) · " : " regalo(s) · ") + x.ref,
+        amount: { currency_code: "USD", value: Number(x.totalUsd).toFixed(2) }
+      }],
+      payment_source: { paypal: { experience_context: {
+        brand_name: "Give&Grow International", shipping_preference: "NO_SHIPPING",
+        user_action: "PAY_NOW", locale: en ? "en-US" : "es-CO",
+        return_url: volver, cancel_url: volver + "&cancelado=1"
+      } } }
+    }, "rg-crear-" + x.ref);
+    const aprobar = r.ok && r.d && Array.isArray(r.d.links) && r.d.links.find((l) => l.rel === "payer-action" || l.rel === "approve");
+    if (!aprobar || !r.d.id) { console.error("paypal crear pedido", x.ref, r.status, JSON.stringify(r.d).slice(0, 300)); return null; }
+    await env.DB.prepare("UPDATE regalo_pedidos SET paypal_order = ? WHERE ref = ?").bind(r.d.id, x.ref).run();
+    return aprobar.href;
+  } catch (e) { console.error("paypal crear pedido", x.ref, e && e.message); return null; }
+}
+
+/* POST /api/regalos/pedido/<RG>/paypal?t= — al volver de PayPal, capturar.
+   Solo con el token del pedido; el id del pedido de PayPal sale de la base,
+   nunca del navegador. */
+async function apiRegalosPaypalCapturar(request, env, ref, token) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const p = await regalosPedidoConToken(env, ref, token);
+  if (!p) return json({ error: "no_encontrado" }, 404);
+  const f = await env.DB.prepare("SELECT canal, paypal_order, estado FROM regalo_pedidos WHERE ref = ?").bind(ref).first();
+  if (!f || f.canal !== "paypal" || !f.paypal_order) return json({ error: "no_encontrado" }, 404);
+  if (f.estado === "pagado") return json({ ok: true, estado: "pagado" });
+  const cfg = paypalConfig(env);
+  if (!cfg) return json({ error: "paypal_no_configurado" }, 503);
+  const tk = await paypalToken(cfg);
+  let r = await paypalPost(cfg, tk, "/v2/checkout/orders/" + encodeURIComponent(f.paypal_order) + "/capture", {}, "rg-capturar-" + ref);
+  let orden = r.d;
+  /* Ya capturado (el webhook, otra pestaña): se lee el pedido tal como está. */
+  if (!r.ok && r.d && Array.isArray(r.d.details) && r.d.details.some((d) => d.issue === "ORDER_ALREADY_CAPTURED")) {
+    const g = await fetch(cfg.base + "/v2/checkout/orders/" + encodeURIComponent(f.paypal_order), { headers: { authorization: "Bearer " + tk } });
+    orden = await g.json().catch(() => ({}));
+  } else if (!r.ok) {
+    console.error("paypal capturar", ref, r.status, JSON.stringify(r.d).slice(0, 300));
+    return json({ error: "no_aprobado", estado: (r.d && r.d.name) || r.status }, 409);
+  }
+  const unidad = orden && Array.isArray(orden.purchase_units) ? orden.purchase_units[0] : null;
+  const cap = unidad && unidad.payments && Array.isArray(unidad.payments.captures) ? unidad.payments.captures[0] : null;
+  if (!cap) return json({ error: "no_aprobado" }, 409);
+  const res = await regalosPaypalCobro(env, ref, Object.assign({ custom_id: unidad.custom_id || unidad.reference_id }, cap));
+  return json({ ok: res === "pagado" || res === "ya_pagado", estado: res });
+}
+
+/* EL ÚNICO SITIO DONDE UN COBRO DE PAYPAL FINANCIA REGALOS. Lo llaman la vuelta
+   del donante y el webhook; es idempotente por el id de la captura. Comprueba
+   las tres cosas que hacen que el dinero sea de ESTE pedido: el RG, la moneda
+   y el monto. Si algo no cuadra, no financia nada y deja un incidente: el
+   dinero existe y una persona decide. */
+async function regalosPaypalCobro(env, ref, cap) {
+  const p = await env.DB.prepare(
+    "SELECT ref, canal, estado, total_usd, idioma, email, nombre, guia FROM regalo_pedidos WHERE ref = ?"
+  ).bind(ref).first();
+  if (!p || p.canal !== "paypal") return "pedido_desconocido";
+  if (String(cap.custom_id || "") !== ref) return "otro_pedido";
+  if (String(cap.status || "").toUpperCase() !== "COMPLETED") return "captura_" + String(cap.status || "?").toLowerCase();
+  const monto = cap.amount || {};
+  const moneda = String(monto.currency_code || "").toUpperCase();
+  const valor = Number(monto.value || 0);
+  const capId = String(cap.id || "").trim();
+  if (!capId) return "captura_sin_id";
+  const ya = await env.DB.prepare("SELECT guia FROM aportes WHERE proveedor = 'paypal' AND proveedor_ref = ?").bind(capId).first();
+  if (ya) return "ya_pagado";
+  if (moneda !== "USD" || Math.round(valor * 100) !== Math.round(Number(p.total_usd) * 100)) {
+    await anotarIncidente(env, "regalos-paypal-monto", ref,
+      "PayPal cobró " + moneda + " " + valor + " al pedido " + ref + ", que vale US$" + p.total_usd + ": no se financió nada, revísalo");
+    return "monto_distinto";
+  }
+  const guia = await siguienteGuia(env, anioCO());
+  const donanteId = await donantePorCorreo(env, p.email, p.nombre, null);
+  await env.DB.prepare(
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
+    "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, donante_id, aprobada_en) " +
+    "VALUES (?, 'aprobada', ?, 'USD', 'fondo', NULL, ?, 'unico', 0, 'no', ?, ?, 'paypal', ?, ?, datetime('now'))"
+  ).bind(guia, Math.round(valor * 100), (p.idioma === "en" ? "December gifts · " : "Regalos de diciembre · ") + ref,
+         p.idioma, tokenNuevo(), capId, donanteId).run();
+  await env.DB.prepare("UPDATE regalo_pedidos SET guia = ? WHERE ref = ?").bind(guia, ref).run();
+  await regalosPedidoPagado(env, ref, "paypal");
+  return "pagado";
+}
+
 /* Lo que pasa con un pedido en pesos cuando Wompi cambia el estado de su
    aporte. Lo llama `aplicarEstado` después de guardar el aporte, así que vale
    también para los pagos rescatados a mano desde la conciliación. */
-async function regalosTrasAporte(env, guia, nuevo, yaAprobada) {
+async function regalosTrasAporte(env, guia, nuevo, yaAprobada, autor) {
   const p = await env.DB.prepare(
     "SELECT ref, estado FROM regalo_pedidos WHERE guia = ?"
   ).bind(guia).first();
   if (!p) return;
   if (nuevo === "aprobada") {
-    await regalosPedidoPagado(env, p.ref, "wompi");
+    await regalosPedidoPagado(env, p.ref, autor || "wompi");
   } else if (nuevo === "pendiente" && p.estado === "pendiente") {
     /* Transferencia en curso: que no se le escape el regalo mientras el banco
        confirma. Solo se alarga lo que todavía es suyo. */
@@ -3634,7 +3855,7 @@ async function regalosTrasAporte(env, guia, nuevo, yaAprobada) {
       "UPDATE regalos SET reservado_hasta = datetime('now', ?) WHERE reserva_ref = ? AND estado = 'publicado'"
     ).bind("+" + REGALOS_RESERVA_PENDIENTE_H + " hours", p.ref).run();
   } else if (["rechazada", "error"].includes(nuevo) && !yaAprobada && p.estado === "pendiente") {
-    await regalosSoltarPedido(env, p.ref, "fallido", "wompi");
+    await regalosSoltarPedido(env, p.ref, "fallido", autor || "wompi");
   }
 }
 
@@ -3659,7 +3880,7 @@ async function regalosSoltarPedido(env, ref, estado, autor) {
 async function regalosPedidoPagado(env, ref, autor) {
   const cambio = await env.DB.prepare(
     "UPDATE regalo_pedidos SET estado = 'pagado', pagado_en = datetime('now'), " +
-    "confirmado_por = CASE WHEN via = 'usd' THEN ? ELSE confirmado_por END, actualizado_en = datetime('now') " +
+    "confirmado_por = CASE WHEN via = 'usd' OR canal = 'banco' THEN ? ELSE confirmado_por END, actualizado_en = datetime('now') " +
     "WHERE ref = ? AND estado IN ('pendiente', 'vencido', 'fallido') RETURNING via"
   ).bind(autor || null, ref).first();
   if (!cambio) return { ya: true };
@@ -3741,15 +3962,20 @@ async function regalosPedidoPagado(env, ref, autor) {
 async function apiRegalosSeguimiento(env, ref, token) {
   if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return json({ error: "no_encontrado" }, 404);
   const p = await env.DB.prepare(
-    "SELECT ref, token, via, estado, total_cop, total_usd, guia, idioma, creado_en, pagado_en " +
+    "SELECT ref, token, via, canal, estado, total_cop, total_usd, guia, idioma, creado_en, pagado_en " +
     "FROM regalo_pedidos WHERE ref = ?"
   ).bind(ref).first();
   if (!p || !igualesSeguro(p.token, token)) return json({ error: "no_encontrado" }, 404);
 
-  let pago = null;
+  let pago = null, comprobante = null;
   if (p.guia) {
-    const a = await env.DB.prepare("SELECT estado FROM aportes WHERE guia = ?").bind(p.guia).first();
+    const a = await env.DB.prepare("SELECT estado, token, comprobante FROM aportes WHERE guia = ?").bind(p.guia).first();
     pago = a ? a.estado : null;
+    /* El soporte de la transferencia se puede subir mientras se verifica. El
+       token del aporte solo lo recibe quien tiene el del pedido. */
+    if (a && p.canal === "banco" && a.estado === "reportada") {
+      comprobante = a.comprobante ? { subido: true } : { subido: false, url: "/api/comprobante/" + p.guia + "?t=" + a.token };
+    }
   }
   const campana = await regalosCampana(env);
   /* Cada ítem con el regalo que de verdad se financió: el escogido o su sustituto. */
@@ -3784,11 +4010,13 @@ async function apiRegalosSeguimiento(env, ref, token) {
   const mensaje = await regalosMensajeDe(env, ref);
   const editable = await regalosMensajeEditable(env, p);
   return json({
-    ref: p.ref, via: p.via, estado: p.estado, pago, guia: p.guia, mensaje, mensaje_editable: editable,
+    ref: p.ref, via: p.via, canal: p.canal || null, estado: p.estado, pago, guia: p.guia, mensaje, mensaje_editable: editable,
     total_cop: p.total_cop, total_usd: p.total_usd,
     creado_en: f(p.creado_en), pagado_en: f(p.pagado_en),
-    aliada: p.via === "usd" && campana ? campana.aliada_nombre : null,
-    aliada_url: p.via === "usd" && p.estado === "pendiente" && campana && campana.aliada_url
+    banco: p.canal === "banco" && p.estado === "pendiente" ? REGALOS_BANCO : null,
+    comprobante,
+    aliada: p.via === "usd" && !p.canal && campana ? campana.aliada_nombre : null,
+    aliada_url: p.via === "usd" && !p.canal && p.estado === "pendiente" && campana && campana.aliada_url
       ? urlAliada(campana.aliada_url, p.ref, p.total_usd) : null,
     items
   });
@@ -4184,7 +4412,7 @@ async function adminRegalos(env) {
     "WHERE n.campana_id = ? ORDER BY n.codigo"
   ).bind(REGALOS_CAMPANA).all();
   const pedidos = await env.DB.prepare(
-    "SELECT p.ref, p.via, p.estado, p.total_cop, p.total_usd, p.nombre, p.email, p.guia, p.creado_en, p.pagado_en, " +
+    "SELECT p.ref, p.via, p.canal, p.estado, p.total_cop, p.total_usd, p.nombre, p.email, p.guia, p.creado_en, p.pagado_en, " +
     "p.confirmado_por, COUNT(i.id) AS items, SUM(CASE WHEN i.resultado = 'sin_cupo' THEN 1 ELSE 0 END) AS sin_cupo, " +
     "SUM(CASE WHEN i.resultado = 'sustituido' THEN 1 ELSE 0 END) AS sustituidos " +
     "FROM regalo_pedidos p LEFT JOIN regalo_pedido_items i ON i.pedido_ref = p.ref " +
@@ -4513,7 +4741,7 @@ async function adminRegalosAccion(request, env, accion, quien) {
   if (accion === "pedido-confirmar" || accion === "pedido-anular") {
     const ref = String(c.ref || "").toUpperCase();
     if (!RE_PEDIDO_REGALO.test(ref)) return json({ error: "ref_invalida" }, 400);
-    const p = await env.DB.prepare("SELECT via, estado FROM regalo_pedidos WHERE ref = ?").bind(ref).first();
+    const p = await env.DB.prepare("SELECT via, canal, guia, estado FROM regalo_pedidos WHERE ref = ?").bind(ref).first();
     if (!p) return json({ error: "no_encontrado" }, 404);
     if (accion === "pedido-anular") {
       if (p.estado !== "pendiente") return json({ error: "no_pendiente" }, 409);
@@ -4523,6 +4751,10 @@ async function adminRegalosAccion(request, env, accion, quien) {
     }
     /* En pesos lo confirma Wompi, nunca una persona: si un pago no llegó, el
        camino es la conciliación de aportes, que deja el rastro de quién. */
+    if (p.canal === "banco") return json({ error: "por_la_bandeja",
+      ayuda: "Una transferencia se confirma contra el extracto en Finanzas › Transferencias por verificar (guía " + p.guia + "). Al confirmarla, los regalos quedan financiados solos." }, 409);
+    if (p.canal === "paypal") return json({ error: "lo_confirma_paypal",
+      ayuda: "Un pago de PayPal se confirma solo con la captura. Si el donante pagó y no aparece, revisa Finanzas › PayPal." }, 409);
     if (p.via !== "usd") return json({ error: "solo_usd",
       ayuda: "Un pedido en pesos lo confirma Wompi. Si el pago no llegó, rescátalo desde Finanzas › Aportes." }, 409);
     const res = await regalosPedidoPagado(env, ref, quien);
@@ -5556,13 +5788,14 @@ function pintarPedidos(){
   if (!P.length) { $("tb-pedidos").innerHTML = "<tr><td colspan='7' class='vacio'>Todavía no hay pedidos.</td></tr>"; return; }
   $("tb-pedidos").innerHTML = P.map(function(p){
     var acc = "";
-    if (p.via === "usd" && (p.estado === "pendiente" || p.estado === "vencido")) {
+    if (p.via === "usd" && !p.canal && (p.estado === "pendiente" || p.estado === "vencido")) {
       acc = "<button class='b chico full' data-confirmar='" + esc(p.ref) + "'>Confirmar pago</button>";
     }
     if (p.estado === "pendiente") acc += " <button class='b chico' data-anular='" + esc(p.ref) + "'>Anular</button>";
     return "<tr><td class='num'>" + esc(p.ref) + (p.guia ? "<br><span class='mu'>" + esc(p.guia) + "</span>" : "") + "</td>" +
       "<td>" + esc(p.nombre) + "<br><span class='mu'>" + esc(p.email) + "</span></td>" +
-      "<td>" + (p.via === "usd" ? usd(p.total_usd) + "<br><span class='mu'>vía aliada</span>" : cop(p.total_cop)) + "</td>" +
+      "<td>" + (p.via === "usd" ? usd(p.total_usd) : cop(p.total_cop)) + "<br><span class='mu'>" +
+        (p.canal === "banco" ? "al banco · se confirma en la bandeja" : p.canal === "paypal" ? "PayPal" : p.via === "usd" ? "vía aliada" : "Wompi") + "</span></td>" +
       "<td>" + p.items + (p.sustituidos ? "<br><span class='mu'>" + p.sustituidos + " sustituido(s)</span>" : "") +
         (p.sin_cupo ? "<br><span class='avisos'>" + p.sin_cupo + " sin cupo</span>" : "") + "</td>" +
       "<td><span class='pill p-" + esc(p.estado) + "'>" + esc(p.estado) + "</span>" +
@@ -16329,6 +16562,9 @@ async function apiPaypalWebhook(request, env) {
       resultado = "expirada";
     } else if (PAYPAL_REVERSAS.includes(tipo)) {
       resultado = await paypalReversa(env, tipo, recurso);
+    } else if (tipo === "PAYMENT.CAPTURE.COMPLETED" && recurso && RE_PEDIDO_REGALO.test(String(recurso.custom_id || ""))) {
+      /* Un pago de regalos (0070): trae su RG en `custom_id`. */
+      resultado = "regalos " + await regalosPaypalCobro(env, String(recurso.custom_id), recurso);
     } else if (tipo === "PAYMENT.SALE.COMPLETED" || tipo === "PAYMENT.CAPTURE.COMPLETED") {
       /* UN COBRO QUE NO ES DE NINGUNA SUSCRIPCION NUESTRA. Casi seguro es una
          donacion del BOTON, que llega por webhook desde que Sebas suscribio
@@ -17663,6 +17899,8 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
     await env.DB.prepare(
       "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
     ).bind(quien || "?", "transferencia " + guia + " DESCARTADA: " + motivo).run();
+    /* Si era un pedido de regalos pagado al banco (0070), sus regalos se sueltan. */
+    try { await regalosTrasAporte(env, guia, "rechazada", false, quien || "banco"); } catch (e) { console.error("regalos tras descartar", guia, e && e.message); }
     return json({ ok: true, guia, estado: "rechazada" });
   }
 
@@ -17784,6 +18022,9 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
       ).bind(mov.id, guia, montoExt * 100, quien || "?").run();
     }
   }
+
+  /* Si era un pedido de regalos pagado al banco (0070), ahora sí se financian. */
+  try { await regalosTrasAporte(env, guia, "aprobada", false, quien || "banco"); } catch (e) { console.error("regalos tras confirmar", guia, e && e.message); }
 
   /* Ahora sí hay dinero: el donante recibe lo mismo que quien paga por la
      pasarela — su recibo con la guía. */
@@ -21540,11 +21781,11 @@ async function apiPortalRegalos(request, env) {
     if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
     const ref = String(c.ref || "").toUpperCase();
     if (!RE_PEDIDO_REGALO.test(ref)) return json({ error: "ref_invalida" }, 400);
-    const p = await env.DB.prepare("SELECT via, estado FROM regalo_pedidos WHERE ref = ? AND campana_id = ?")
+    const p = await env.DB.prepare("SELECT via, canal, estado FROM regalo_pedidos WHERE ref = ? AND campana_id = ?")
       .bind(ref, REGALOS_CAMPANA).first();
     /* Solo los pedidos en dólares: los de pesos los confirma Wompi y no son
        de la aliada. */
-    if (!p || p.via !== "usd") return json({ error: "no_encontrado" }, 404);
+    if (!p || p.via !== "usd" || p.canal) return json({ error: "no_encontrado" }, 404);
     if (c.accion === "confirmar") {
       if (p.estado === "pagado") return json({ ok: true, ya: true });
       if (p.estado === "anulado") return json({ error: "anulado", ayuda: "Este pedido se anuló. Escríbanle a Give&Grow si el pago sí llegó." }, 409);
@@ -21568,7 +21809,8 @@ async function apiPortalRegalos(request, env) {
       "SELECT z.id, z.nombre_es AS nombre, z.meta, z.orden, " +
       "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado NOT IN ('borrador','retirado')) AS publicados, " +
       "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado IN ('financiado','comprado','despachado','entregado')) AS financiados, " +
-      "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado IN ('financiado','comprado','despachado','entregado') AND r.via = 'usd') AS por_usd, " +
+      "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado IN ('financiado','comprado','despachado','entregado') AND r.via = 'usd' " +
+      "AND NOT EXISTS (SELECT 1 FROM regalo_pedidos q WHERE q.ref = r.pedido_ref AND q.canal IS NOT NULL)) AS por_usd, " +
       "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado = 'entregado') AS entregados " +
       "FROM regalo_zonas z WHERE z.campana_id = ? ORDER BY z.orden"
     ).bind(REGALOS_CAMPANA).all(),
@@ -21588,7 +21830,7 @@ async function apiPortalRegalos(request, env) {
       "(SELECT json_group_array(json_object('codigo', r.codigo, 'usd', i.valor_usd, 'resultado', i.resultado, " +
       "'sustituto', (SELECT r2.codigo FROM regalos r2 WHERE r2.id = i.sustituto_id))) " +
       "FROM regalo_pedido_items i JOIN regalos r ON r.id = i.regalo_id WHERE i.pedido_ref = p.ref) AS items " +
-      "FROM regalo_pedidos p WHERE p.campana_id = ? AND p.via = 'usd' AND p.estado <> 'anulado' ORDER BY p.creado_en DESC LIMIT 500"
+      "FROM regalo_pedidos p WHERE p.campana_id = ? AND p.via = 'usd' AND p.canal IS NULL AND p.estado <> 'anulado' ORDER BY p.creado_en DESC LIMIT 500"
     ).bind(REGALOS_CAMPANA).all()
   ]);
   return json({
@@ -51958,6 +52200,8 @@ export default {
         if (rgm) return rgm[2].toLowerCase() === "video"
           ? await apiRegalosVideo(request, env, rgm[1].toUpperCase(), url.searchParams.get("t"), url)
           : await apiRegalosMensaje(request, env, rgm[1].toUpperCase(), url.searchParams.get("t"));
+        const rgpp = ruta.match(/^\/api\/regalos\/pedido\/(RG-\d{4}-\d{6})\/paypal$/i);
+        if (rgpp) return await apiRegalosPaypalCapturar(request, env, rgpp[1].toUpperCase(), url.searchParams.get("t"));
         const rgp = ruta.match(/^\/api\/regalos\/pedido\/(RG-\d{4}-\d{6})$/i);
         if (rgp) return await apiRegalosSeguimiento(env, rgp[1].toUpperCase(), url.searchParams.get("t"));
         const rgf = ruta.match(/^\/api\/regalos\/foto\/([A-Za-z]{3}-\d{4})$/);
