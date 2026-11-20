@@ -2623,6 +2623,13 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-usd-t{font-size:var(--fs-h3);font-weight:700;margin:0 0 10px}
 .rg-ref{font-family:var(--font-display);font-size:var(--fs-h2);color:var(--rojo);margin:14px 0}
 .rg-usd-acc{display:flex;flex-wrap:wrap;gap:12px}
+/* LOS DATOS DEL BANCO (0070): la misma lista del recibo, con el botón de copiar
+   junto a lo que se teclea en el banco (concepto, cuenta, SWIFT). */
+.rg-banco{margin:6px 0 10px;max-width:640px}
+.rg-banco dd{display:flex;flex-wrap:wrap;align-items:center;gap:10px;overflow-wrap:anywhere}
+.rg-comp{margin:18px 0 22px;max-width:640px;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.rg-comp label{font-weight:600}
+.rg-comp .rg-ayuda{margin:0}
 .rg-barra{position:fixed;left:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:16px;max-width:calc(100% - 110px);padding:8px 8px 8px 20px;background:var(--surface);color:var(--ink);border:1px solid var(--oro);border-radius:999px;box-shadow:var(--shadow-lg);font-size:var(--fs-14);font-weight:600}
 .rg-barra[hidden]{display:none}
 #rg-barra-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
