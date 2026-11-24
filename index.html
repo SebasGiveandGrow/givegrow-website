@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=ecc8731f">
+<link rel="stylesheet" href="/styles.css?v=ac753a4b">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=4c7835bb" defer></script>
+<script src="/app.js?v=f7bda0e6" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -2415,16 +2415,25 @@
           </div>
           <div class="cinf-cuerpo cinf-cuenta">
             <div class="cinf-fila-monto">
+              <!-- Dos preguntas con nombre propio: cada cuánto y en qué moneda.
+                   Cada una es un selector segmentado con sus divisiones a la
+                   vista; antes eran cinco palabras sueltas en una fila. -->
               <div class="cinf-et">
-                <div class="cinf-frec" id="calc-freq" role="group" aria-label="Frecuencia" data-i18n="calc.freq.aria" data-i18n-attr="aria-label">
-                  <button type="button" id="freq-m" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
-                  <button type="button" id="freq-a" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
-                  <button type="button" id="freq-u" class="on" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
+                <div class="cinf-grupo" id="calc-freq-g">
+                  <span class="cinf-g-et" id="calc-freq-et" data-i18n="calc.freq.et">Frecuencia</span>
+                  <div class="cinf-seg" id="calc-freq" role="group" aria-labelledby="calc-freq-et">
+                    <button type="button" id="freq-u" class="on" aria-pressed="true" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
+                    <button type="button" id="freq-m" aria-pressed="false" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
+                    <button type="button" id="freq-a" aria-pressed="false" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
+                  </div>
                 </div>
                 <p class="cinf-campana" id="calc-campana-nota" hidden></p>
-                <div class="cinf-cur" role="group" aria-label="Moneda" data-i18n="calc.cur.aria" data-i18n-attr="aria-label">
-                  <button type="button" id="cur-cop" class="on" data-act="setCur('COP')">COP</button>
-                  <button type="button" id="cur-usd" data-act="setCur('USD')">USD</button>
+                <div class="cinf-grupo">
+                  <span class="cinf-g-et" id="calc-cur-et" data-i18n="calc.cur.et">Moneda</span>
+                  <div class="cinf-seg" role="group" aria-labelledby="calc-cur-et">
+                    <button type="button" id="cur-cop" class="on" aria-pressed="true" data-act="setCur('COP')">COP</button>
+                    <button type="button" id="cur-usd" aria-pressed="false" data-act="setCur('USD')">USD</button>
+                  </div>
                 </div>
               </div>
               <div class="cinf-monto">

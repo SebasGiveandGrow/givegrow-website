@@ -3592,14 +3592,19 @@ html[data-theme="dark"] .sf-puerta-f{background:var(--acc);color:var(--ink-deep)
 /* 02 · La cuenta */
 .cinf-cuenta{container-type:inline-size}
 .cinf-fila-monto{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px 32px;padding:2px 0 14px;border-bottom:1px solid var(--bd)}
-.cinf-et{min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:0 28px}
-.cinf-frec,.cinf-cur{display:flex;gap:0 20px}
-.cinf-frec[hidden]{display:none}
-.cinf-frec button,.cinf-cur button{position:relative;background:none;border:0;padding:0;min-height:44px;font:inherit;font-size:var(--fs-15);font-weight:500;color:var(--mu);cursor:pointer}
-.cinf-cur button{font-size:var(--fs-13);letter-spacing:.06em}
-.cinf-frec button:hover,.cinf-cur button:hover{color:var(--ink)}
-.cinf-frec button.on,.cinf-cur button.on{color:var(--ink);font-weight:600}
-.cinf-frec button.on::after,.cinf-cur button.on::after{content:"";position:absolute;left:0;right:0;bottom:8px;height:2px;background:var(--ink)}
+.cinf-et{min-width:0;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 28px}
+/* Cada pregunta lleva su nombre encima y sus opciones en un selector
+   segmentado: borde de tinta, una división entre opciones y la elegida en
+   tinta llena. Se lee como una elección, no como texto suelto. */
+.cinf-grupo{min-width:0}
+.cinf-grupo[hidden]{display:none}
+.cinf-g-et{display:block;margin:0 0 6px;font-size:var(--fs-12);letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:var(--mu)}
+.cinf-seg{display:inline-flex;border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+.cinf-seg button{min-height:44px;padding:0 18px;background:transparent;border:0;border-left:1px solid var(--ink);font:inherit;font-size:var(--fs-15);font-weight:500;color:var(--ink-soft);cursor:pointer;transition:background-color .15s ease,color .15s ease}
+.cinf-seg button:first-child{border-left:0}
+.cinf-seg button:hover{background:var(--surface-2);color:var(--ink)}
+.cinf-seg button.on{background:var(--ink);color:var(--bg);font-weight:600}
+.cinf-seg button:focus-visible{outline:2px solid var(--acc);outline-offset:-4px}
 .cinf-campana{margin:0;font-size:var(--fs-14);color:var(--ink-soft);max-width:40ch}
 .cinf-campana[hidden]{display:none}
 .cinf-aviso,.cinf-rate{grid-column:1/-1;margin:0;font-size:var(--fs-14);color:var(--ink-soft)}
@@ -3719,4 +3724,5 @@ html[data-theme="dark"] .rinf-logo{mix-blend-mode:normal;background:#fff;padding
 @media (prefers-reduced-motion:reduce){
   .cinf-alc b.cinf-cambia,.cinf-firma.cinf-mueve .cinf-firma-n{animation:none}
   .cinf-fila{transition:none}
+  .cinf-seg button{transition:none}
 }

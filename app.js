@@ -2212,6 +2212,8 @@ var I18N = {
     "calc.p2.nota":"Los montos sugeridos se ajustan a lo que elegiste. También puedes escribir el tuyo.",
     "calc.freq.aria":"Frecuencia",
     "calc.cur.aria":"Moneda",
+    "calc.freq.et":"Frecuencia",
+    "calc.cur.et":"Moneda",
     "calc.sug.aria":"Montos sugeridos",
     "calc.p3.t":"Confirmar",
     "calc.p3.nota":"Revisa el resumen antes de pasar al pago.",
@@ -4850,7 +4852,7 @@ function calcUpdate(animar){
   /* La campaña (brigada) es una operación puntual, no una membresía: fuerza
      aporte único y esconde la frecuencia. */
   var campana = esBrigada(calc.projectId);
-  var fq = document.getElementById("calc-freq"); if (fq) fq.hidden = campana;
+  var fq = document.getElementById("calc-freq-g"); if (fq) fq.hidden = campana;
   var cn = document.getElementById("calc-campana-nota");
   if (cn){ cn.hidden = !campana; cn.textContent = campana ? t("calc.brigada.unico") : ""; }
 
