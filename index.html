@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=59a6274f">
+<link rel="stylesheet" href="/styles.css?v=ecc8731f">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=51e0233b" defer></script>
+<script src="/app.js?v=4c7835bb" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -420,7 +420,16 @@
       <span class="ey rv" data-i18n="hub.found.ey">Fundaciones del HUB SOCIAL</span>
       <h2 class="h-sec rv" data-i18n="hub.found.t">Quiénes forman la red hoy</h2>
       <p class="lead rv d1" data-i18n="hub.found.p">Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.</p>
-      <div id="aliadas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
+      <!-- LA RED COMO ÍNDICE (20 nov 2026): una entrada por fundación, en orden
+           alfabético —nombre y logo, dónde, con quién y sus programas con el costo
+           de una unidad—. Cada programa lleva a la calculadora con ese destino
+           elegido. La foto va sin nada encima: nunca texto sobre fotos con menores. -->
+      <div class="rinf rv d2">
+        <p class="cinf-ver rinf-ver" id="red-ver" role="group" aria-label="Filtrar fundaciones por tema" data-i18n="red.ver.aria" data-i18n-attr="aria-label"></p>
+        <ul class="rinf-lista" id="aliadas-grid"></ul>
+        <p class="rinf-vacio" id="red-vacio" hidden></p>
+        <p class="rinf-pie" data-i18n="red.pie">Las cifras de población y los costos por unidad los reporta cada fundación; «verificado» indica que Give&amp;Grow revisó el soporte del costo. Las fotografías se publican con autorización de la fundación que las aporta.</p>
+      </div>
     </div>
   </section>
   <section id="hub-aportan-sec">
@@ -2360,65 +2369,101 @@
   </section>
   <section class="don-calc">
     <div class="wrap rv d2">
-      <div class="calc">
-        <div class="calc-cap" id="calc-tipo-lbl" data-i18n="calc.tipo.lbl">¿Aportas como persona o empresa?</div>
-        <div class="calc-tabs" role="group" aria-labelledby="calc-tipo-lbl">
-          <button type="button" id="ctab-ind" class="calc-tab on" aria-pressed="true" data-act="setCalcMode('ind')" data-i18n="calc.tab.ind">Persona</button>
-          <button type="button" id="ctab-emp" class="calc-tab" aria-pressed="false" data-act="setCalcMode('emp')" data-i18n="calc.tab.emp">Empresa</button>
-        </div>
-        <div class="cur-toggle">
-          <button id="cur-cop" class="on" data-act="setCur('COP')">COP</button>
-          <button id="cur-usd" data-act="setCur('USD')">USD</button>
-        </div>
-        <div class="calc-dest">
-          <label class="calc-dest-lbl" for="calc-project" data-i18n="calc.dest.lbl">¿A dónde va tu aporte?</label>
-          <select id="calc-project" class="calc-select" data-change="setProject(this.value)"></select>
-        </div>
-        <div class="calc-amount"><div id="calc-display">$200.000</div></div>
-        <input id="calc-manual" type="text" inputmode="numeric" enterkeyhint="done" placeholder="Escribe el monto de tu donación" data-input="onManual(this.value)" data-i18n="calc.manual.aria" data-i18n-attr="aria-label,placeholder" aria-label="Escribe el monto de tu donación">
-        <div id="calc-rate"></div>
-        <input id="calc-slider" type="range" min="0" max="100" value="50" data-input="onSlider(this.value)" data-i18n="calc.slider.aria" data-i18n-attr="aria-label" aria-label="Ajusta el monto de tu donación">
-        <div class="calc-hints"><span>$5.000</span><span>$20.000.000</span></div>
-        <div class="calc-quick" id="calc-quick">
-          <button class="qbtn" data-act="setQuick(25000)">$25K</button>
-          <button class="qbtn" data-act="setQuick(100000)">$100K</button>
-          <button class="qbtn" data-act="setQuick(500000)">$500K</button>
-          <button class="qbtn" data-act="setQuick(1000000)">$1M</button>
-          <button class="qbtn" data-act="setQuick(5000000)">$5M</button>
-          <button class="qbtn" data-act="setQuick(20000000)">$20M</button>
-        </div>
-        <div class="cur-toggle" id="calc-freq">
-          <button id="freq-m" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
-          <button id="freq-a" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
-          <button id="freq-u" class="on" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
-        </div>
-        <!-- Reemplaza al selector de frecuencia cuando el destino es una campaña
-             puntual: ahí el aporte es único y ofrecer «mensual» sería cobrar
-             todos los meses por una emergencia que termina. -->
-        <p class="calc-legal" id="calc-campana-nota" style="display:none;text-align:center;max-width:none"></p>
-        <!-- Los valores de abajo son el estado por defecto de la calculadora ($200.000 / mes, COP):
-             calcUpdate() los recalcula al cargar y en cada cambio. Se escriben resueltos, no como
-             guiones, para que el HTML servido nunca muestre campos vacíos en la página donde se
-             pide dinero. co-impact queda vacío a propósito: depende de datos de partners.json. -->
-        <div class="calc-out">
-          <div class="calc-row"><span data-i18n="calc.tax">Descuento posible (25% del valor donado)</span><b id="co-tax">$50.000</b></div>
-          <p class="calc-legal" data-i18n="calc.tax.legal">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.</p>
-          <div class="calc-row"><span data-i18n="calc.net">Costo neto estimado, si te aplica</span><b id="co-net">$150.000</b></div>
-          <div class="calc-row" id="calc-annual-row"><span data-i18n="calc.annual">Equivalente anual</span><b id="calc-annual">$2.400.000</b></div>
-          <div class="calc-row" id="co-impact-row" style="display:none"><span data-i18n="calc.impact">Tu impacto</span><b id="co-impact"></b></div>
-          <div class="member" id="calc-member"><span id="m-ic"></span><div><div id="m-name">Árbol</div><div id="m-sub">~ 48 USD / mes</div></div></div>
-          <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note">Equivalencia aproximada, según datos de las fundaciones del HUB SOCIAL.</p>
-          <div class="calc-note">
-            <label for="calc-msg" data-i18n="calc.note.lbl">Deja un mensaje o dedicatoria (opcional)</label>
-            <textarea id="calc-msg" rows="3" maxlength="280" data-input="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
-            <span class="calc-note-count"><span id="calc-msg-count">0</span>/280</span>
+      <!-- LA CALCULADORA COMO INFORME (20 nov 2026, Sebas aprobó el prototipo).
+           Tres pasos de verdad —destino, monto, confirmar— sobre papel, con la
+           franja «Tu aporte» fija mientras se elige el destino: el monto se ve
+           desde el inicio y es el MISMO de 02 (escribir en uno cambia el otro).
+           El pago sigue en el panel oscuro de siempre: su CSS depende de él. -->
+      <div class="cinf" id="calc-inf">
+        <div class="cinf-tramo">
+          <div class="cinf-banda" id="cinf-banda" role="group" aria-labelledby="cinf-banda-et">
+            <div class="cinf-lado"><p class="cinf-ey" id="cinf-banda-et" data-i18n="calc.banda.ey">Tu aporte</p></div>
+            <div class="cinf-cuerpo cinf-banda-c">
+              <div class="cinf-monto cinf-monto-b">
+                <span class="cinf-sim" aria-hidden="true">$</span>
+                <label for="calc-top" class="sr-only" data-i18n="calc.manual.aria">Escribe el monto de tu donación</label>
+                <span class="cinf-espejo" aria-hidden="true"></span>
+                <input id="calc-top" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" spellcheck="false" aria-describedby="cinf-b-aviso">
+              </div>
+              <p class="cinf-b-txt" id="cinf-b-txt"></p>
+              <p class="cinf-b-aviso" id="cinf-b-aviso"></p>
+            </div>
+          </div>
+          <div class="cinf-sec calc-dest" id="calc-paso-dest">
+            <div class="cinf-lado">
+              <span class="cinf-n">01</span>
+              <h2 class="cinf-h" id="calc-h-dest" tabindex="-1" data-i18n="calc.p1.t">Destino</h2>
+              <p class="cinf-nota" data-i18n="calc.p1.nota">Elige un programa. A la derecha ves lo que alcanza tu aporte.</p>
+            </div>
+            <div class="cinf-cuerpo">
+              <p class="cinf-ver" id="calc-ver" role="group" aria-label="Filtrar destinos por tema" data-i18n="calc.ver.aria" data-i18n-attr="aria-label"></p>
+              <fieldset class="cinf-ledger">
+                <legend class="sr-only" data-i18n="calc.dest.lbl">¿A dónde va tu aporte?</legend>
+                <div id="calc-ledger"></div>
+              </fieldset>
+              <p class="cinf-aviso-l" id="calc-l-aviso" hidden></p>
+              <button type="button" class="cinf-enlace cinf-cambiar" id="calc-cambiar" data-i18n="calc.cambiar">Cambiar destino</button>
+            </div>
           </div>
         </div>
-        <!-- El pago cierra la calculadora: es el paso siguiente a la dedicatoria,
-             no una sección aparte. El monto, la frecuencia y el destino salen del
-             estado de la calculadora; la firma la calcula el Worker.
-             OJO: este bloque vive sobre el panel OSCURO en los dos temas — su CSS
-             no puede depender de --surface/--ink. -->
+
+        <div class="cinf-sec" id="calc-paso-monto">
+          <div class="cinf-lado">
+            <span class="cinf-n">02</span>
+            <h2 class="cinf-h" data-i18n="calc.p2.t">Monto</h2>
+            <p class="cinf-nota cinf-nota-monto" data-i18n="calc.p2.nota">Los montos sugeridos se ajustan a lo que elegiste. También puedes escribir el tuyo.</p>
+          </div>
+          <div class="cinf-cuerpo cinf-cuenta">
+            <div class="cinf-fila-monto">
+              <div class="cinf-et">
+                <div class="cinf-frec" id="calc-freq" role="group" aria-label="Frecuencia" data-i18n="calc.freq.aria" data-i18n-attr="aria-label">
+                  <button type="button" id="freq-m" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
+                  <button type="button" id="freq-a" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
+                  <button type="button" id="freq-u" class="on" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
+                </div>
+                <p class="cinf-campana" id="calc-campana-nota" hidden></p>
+                <div class="cinf-cur" role="group" aria-label="Moneda" data-i18n="calc.cur.aria" data-i18n-attr="aria-label">
+                  <button type="button" id="cur-cop" class="on" data-act="setCur('COP')">COP</button>
+                  <button type="button" id="cur-usd" data-act="setCur('USD')">USD</button>
+                </div>
+              </div>
+              <div class="cinf-monto">
+                <span class="cinf-sim" aria-hidden="true" id="calc-sim">$</span>
+                <label for="calc-manual" class="sr-only" data-i18n="calc.manual.aria">Escribe el monto de tu donación</label>
+                <span class="cinf-espejo" aria-hidden="true"></span>
+                <input id="calc-manual" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" spellcheck="false" aria-describedby="calc-aviso">
+              </div>
+              <p class="cinf-aviso" id="calc-aviso" role="status"></p>
+              <p class="cinf-rate" id="calc-rate"></p>
+            </div>
+            <div class="cinf-sug" id="calc-quick" role="group" aria-label="Montos sugeridos" data-i18n="calc.sug.aria" data-i18n-attr="aria-label"></div>
+            <p class="cinf-uni" id="calc-uni"></p>
+            <div class="cinf-total">
+              <p class="cinf-firma" id="calc-firma"><span class="cinf-firma-n" id="calc-firma-n"></span> <span class="cinf-firma-u" id="calc-firma-u"></span></p>
+              <p class="cinf-firma-linea" id="calc-firma-linea"></p>
+              <p class="cinf-firma-nota" id="calc-firma-nota"></p>
+            </div>
+            <p class="sr-only" id="calc-anuncio" aria-live="polite" aria-atomic="true"></p>
+            <dl class="cinf-filas cinf-incluye" id="calc-incluye" hidden></dl>
+          </div>
+        </div>
+
+        <div class="cinf-sec" id="calc-paso-pagar">
+          <div class="cinf-lado">
+            <span class="cinf-n">03</span>
+            <h2 class="cinf-h" data-i18n="calc.p3.t">Confirmar</h2>
+            <p class="cinf-nota" data-i18n="calc.p3.nota">Revisa el resumen antes de pasar al pago.</p>
+          </div>
+          <div class="cinf-cuerpo">
+            <p class="cinf-frase" id="calc-frase"></p>
+            <dl class="cinf-filas" id="calc-resumen"></dl>
+            <p class="cinf-legal" data-i18n="calc.tax.legal">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.</p>
+            <div class="calc cinf-pago">
+              <div class="calc-note">
+                <label for="calc-msg" data-i18n="calc.note.lbl">Deja un mensaje o dedicatoria (opcional)</label>
+                <textarea id="calc-msg" rows="3" maxlength="280" data-input="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
+                <span class="calc-note-count"><span id="calc-msg-count">0</span>/280</span>
+              </div>
         <div class="pay-now">
           <span class="ey" data-i18n="pay.now.ey">Pago en línea</span>
               <!-- ELEGIR PASARELA. Reusa `.cur-toggle`, el mismo grupo de
@@ -2460,6 +2505,9 @@
           <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
           <!-- La franja de confianza: su marcado vive UNA vez, en <template id="tpl-franja">. -->
           <div class="franja" data-franja></div>
+        </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -350,10 +350,6 @@ section{padding:72px 0}
 .g3{grid-template-columns:repeat(3,1fr)}
 .card{background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:26px;box-shadow:var(--shadow);transition:transform .2s var(--ease),box-shadow .2s}
 .card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
-.card-empty{border-style:dashed;background:transparent;box-shadow:none}
-.card-empty:hover{transform:none;box-shadow:none}
-.card-empty h3{color:var(--ink)}
-.card-empty p{color:var(--mu)}
 .tier-more{font-size:var(--fs-13);font-weight:700;color:var(--ink);margin:14px 0 8px}
 .cta-note{font-size:var(--fs-13);color:var(--mu);max-width:480px;margin:22px auto 0;line-height:1.5}
 .card .ic{width:46px;height:46px;border-radius:12px;background:var(--gl);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
@@ -432,35 +428,14 @@ section{padding:72px 0}
    o tres— con dos dibujos distintos. Ahora las cuatro son el mismo carril con
    el mismo segmento claro para lo elegido, a 44 px de alto. El panel es oscuro
    en los dos temas, así que todo sale de la escala --on-dark. */
-.calc-tabs,.cur-toggle{display:flex;gap:4px;padding:3px;margin-bottom:18px;
+.cur-toggle{display:flex;gap:4px;padding:3px;margin-bottom:18px;
   border:1px solid var(--on-dark-line);border-radius:999px;background:var(--on-dark-fill-2)}
-.calc-tabs{margin-bottom:22px}
-.calc-tab,.cur-toggle button{flex:1 1 0;min-width:0;min-height:44px;padding:6px 12px;
+.cur-toggle button{flex:1 1 0;min-width:0;min-height:44px;padding:6px 12px;
   border:0;border-radius:999px;background:transparent;color:var(--on-dark-3);
   font-weight:700;font-size:var(--fs-14);transition:background .15s,color .15s}
-.calc-tab:hover:not(.on),.cur-toggle button:hover:not(.on){color:var(--on-dark)}
-.calc-tab.on,.cur-toggle button.on{background:var(--on-dark);color:var(--ink-deep)}
-.calc-amount{text-align:center;margin-bottom:6px}
-#calc-display{font-family:var(--font-display);font-size:clamp(22px,7vw,42px);font-weight:800;color:var(--on-dark);letter-spacing:-.01em;line-height:1.05;white-space:nowrap}
-#calc-manual{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-fill);color:var(--on-dark);border-radius:10px;padding:10px;text-align:center;font-size:var(--fs-16);margin:6px 0 4px}
-/* Vacío hasta que se escribe: el «0» de ejemplo se leía como un monto, debajo
-   de los $200.000 de la cifra grande. Ahora el ejemplo dice qué va ahí. */
-#calc-manual::placeholder{color:var(--on-dark-4);font-size:var(--fs-14)}
-#calc-rate{font-size:var(--fs-12);color:var(--on-dark-4);text-align:center;margin-bottom:16px;min-height:16px}
+.cur-toggle button:hover:not(.on){color:var(--on-dark)}
+.cur-toggle button.on{background:var(--on-dark);color:var(--ink-deep)}
 input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
-.calc-hints{display:flex;justify-content:space-between;font-size:var(--fs-11);color:var(--on-dark-4);margin-bottom:16px}
-/* Seis montos en rejilla de 3 × 2: con flex se partían en 4 + 2 y la segunda
-   fila quedaba huérfana en el centro. */
-.calc-quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}
-.qbtn{min-height:44px;padding:6px 12px;border-radius:999px;border:1px solid var(--on-dark-line);color:var(--on-dark-2);font-size:var(--fs-14);font-weight:700}
-.qbtn:hover{border-color:var(--brote);color:var(--brote)}
-.calc-out{background:var(--on-dark-fill-2);border-radius:14px;padding:18px;display:grid;gap:10px}
-.calc-row{display:flex;justify-content:space-between;font-size:var(--fs-14)}
-.calc-row b{color:var(--brote)}
-.member{display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--on-dark-fill-2)}
-#m-ic{font-size:30px}
-#m-name{font-weight:800;font-family:"Inter",sans-serif}
-#m-sub{font-size:var(--fs-13);color:var(--on-dark-4)}
 
 /* ===== PAYMENTS ===== */
 .pay-tabs{display:flex;gap:8px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
@@ -963,8 +938,6 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .card-link{display:inline-flex;align-items:center;gap:.3em;min-height:44px;margin-top:3px;color:var(--acc);font-weight:700;font-size:var(--fs-14);text-decoration:none}
 .card-link:hover{text-decoration:underline}
 
-#m-ic{display:inline-flex;align-items:center}
-#m-ic .ic-svg{width:30px;height:30px;color:var(--acc)}
 
 .origen-img{width:100%;border-radius:var(--rl);aspect-ratio:16/9;max-height:520px;object-fit:cover;object-position:50% 45%;display:block}
 
@@ -1094,7 +1067,6 @@ html[data-marca="mmc"] .hero-cred{display:none}
 .sello-go{display:block;margin-left:auto;color:var(--acc);font-weight:700;flex:0 0 auto}
 .sello:hover b{color:var(--acc)}
 /* En la tarjeta del HUB no cabe el sello entero: solo la línea, y en pequeño. */
-.sello-mini{display:block;font-size:var(--fs-11);font-weight:600;color:var(--acc);margin-top:3px}
 
 .pcard-logo{width:56px;height:56px;object-fit:contain;background:var(--logo-bg);padding:5px;box-sizing:border-box;border-radius:12px;border:1px solid var(--bd);flex:0 0 auto}
 .pcard-body{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -1246,7 +1218,7 @@ html[data-theme="dark"]{
   --fab-shadow-hover:0 2px 6px rgba(0,0,0,.55), 0 14px 32px rgba(0,0,0,.55);
 }
 html[data-theme="dark"] .hero-bg img{filter:brightness(.8)}
-html[data-theme="dark"] .cur-toggle button.on,html[data-theme="dark"] .calc-tab.on{color:#0E2118}
+html[data-theme="dark"] .cur-toggle button.on{color:#0E2118}
 
 /* Transición suave al cambiar de tema (respetando reduced-motion global) */
 html.theming, html.theming body, html.theming nav, html.theming .card,
@@ -1375,13 +1347,8 @@ html[data-theme="dark"] .prog-logo{background:#000}
 
 /* ---------- calculadora: selector de destino y nota ---------- */
 .calc-dest{margin:2px 0 12px}
-.calc-dest-lbl,.calc-cap{display:block;font-size:var(--fs-13);font-weight:700;color:var(--on-dark-2);margin-bottom:6px;letter-spacing:.2px}
-.calc-select{width:100%;min-height:44px;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:11px 12px;font-size:var(--fs-15);font-weight:600;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
-.calc-select:focus{outline:none;border-color:var(--on-dark-4)}
 /* Blanco literal a propósito en optgroup/option: la lista desplegable la pinta el
    sistema operativo y no todos los navegadores resuelven var() ahí dentro. */
-.calc-select optgroup{color:#0E2118;background:#fff;font-weight:800}
-.calc-select option{color:#0E2118;background:#fff;font-weight:500}
 .calc-note{margin-top:16px;text-align:left}
 .calc-note label{display:block;font-size:var(--fs-13);font-weight:700;color:var(--on-dark-2);margin-bottom:6px}
 /* Alto para tres renglones: con dos, el texto de ejemplo se cortaba a 375 px.
@@ -1398,12 +1365,10 @@ html[data-theme="dark"] .prog-logo{background:#000}
    ahi—; el destino (15px) y la dedicatoria (14px) se quedaron fuera.
    Solo en pantallas estrechas: en escritorio la escala se respeta tal cual. */
 @media(max-width:640px){
-  .calc-select,
   .calc-note textarea{font-size:var(--fs-16)}
 }
 
 /* nota legal pequeña bajo el beneficio tributario */
-.calc-legal{font-size:var(--fs-13);line-height:1.5;color:var(--on-dark-4);margin:2px 0 8px;max-width:52ch}
 /* `.mu` es el gris apagado del fondo PAPEL, y `.calc` es oscuro en los DOS
    temas. Un `.mu` que caiga aquí dentro queda en 2,28:1 —medido— cuando el
    mínimo es 4,5. Le pasaba a la nota de equivalencia de impacto, visible, de
@@ -1540,8 +1505,8 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
    La X de ALMA amplía su zona de toque con un ::after invisible, para que
    el círculo de 30px siga viéndose igual en la cabecera del panel. */
 @media (pointer:coarse){
-  .lang button,.cur-toggle button,.qbtn,.copy,.alma-chip,.track-noguide{min-height:44px}
-  .qbtn,.copy,.lang button{min-width:44px}
+  .lang button,.cur-toggle button,.copy,.alma-chip,.track-noguide{min-height:44px}
+  .copy,.lang button{min-width:44px}
   .alma-x{position:relative}
   .alma-x::after{content:"";position:absolute;inset:-7px;border-radius:50%}
 }
@@ -3546,3 +3511,212 @@ html[data-theme="dark"] .sf-puerta-f{background:var(--acc);color:var(--ink-deep)
 .odsr-f{font-size:var(--fs-13);color:var(--mu)}
 .odsr-u{font-size:var(--fs-13);color:var(--acc);font-weight:600}
 .odsr-nota{margin-top:16px;font-size:var(--fs-14)}
+
+/* ══ CALCULADORA COMO INFORME (20 nov 2026) ═══════════════════════════════
+   Tres pasos sobre papel —01 destino, 02 monto, 03 confirmar— con el lenguaje
+   de .inf-sec: regla de tinta de 2 px por sección, filas de 1 px, cifras
+   tabulares. Un solo elemento firma: la cifra del resultado en Unbounded verde.
+   La franja «Tu aporte» queda fija mientras se elige el destino. El pago va
+   en el panel oscuro de siempre (.calc), porque su CSS depende de él. */
+.cinf{max-width:1080px;margin:0 auto;text-align:left}
+.cinf-tramo{position:relative}
+.cinf-sec,.cinf-banda{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr);gap:16px 48px}
+.cinf-sec{border-top:2px solid var(--ink);padding:26px 0 40px}
+.cinf-lado,.cinf-cuerpo{min-width:0}
+.cinf-ey{margin:0;font-size:var(--fs-12);letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--mu)}
+.cinf-n{display:block;font-family:var(--font-display);font-weight:600;font-size:var(--fs-14);color:var(--acc);font-variant-numeric:tabular-nums}
+.cinf-h{margin:4px 0 0;font-family:"Inter",system-ui,sans-serif;letter-spacing:-.005em;font-size:var(--fs-h4);font-weight:600;line-height:1.3;color:var(--ink)}
+.cinf-h:focus{outline:none}
+.cinf-nota{margin:8px 0 0;font-size:var(--fs-14);line-height:1.5;color:var(--mu)}
+.cinf-num{font-variant-numeric:tabular-nums}
+.cinf-enlace{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--acc);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px;cursor:pointer}
+.cinf-enlace:hover{text-decoration-thickness:2px}
+
+/* La franja «Tu aporte» */
+.cinf-banda{position:sticky;top:var(--nav-h,72px);z-index:5;align-items:center;padding:14px 0;background:var(--bg);border-top:2px solid var(--ink);border-bottom:1px solid var(--ink)}
+.cinf-banda + .cinf-sec{border-top:0}
+.cinf-banda-c{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 22px}
+.cinf-b-txt{margin:0;font-size:var(--fs-15);line-height:1.45;color:var(--ink-soft);min-width:0}
+.cinf-b-txt b{font-weight:600;color:var(--ink)}
+.cinf-b-aviso{flex-basis:100%;margin:0;font-size:var(--fs-14);color:var(--ink-soft)}
+.cinf-b-aviso:empty{display:none}
+#calc-paso-dest{scroll-margin-top:calc(var(--nav-h,72px) + var(--cinf-banda-h,96px))}
+
+/* El campo del monto (los dos son iguales; el de la franja, más chico) */
+.cinf-monto{position:relative;display:flex;align-items:baseline;justify-content:flex-end;gap:4px;border-bottom:1px solid var(--ink);padding-bottom:2px;min-width:0}
+.cinf-sim{font-family:var(--font-display);font-weight:500;font-size:var(--fs-h3);color:var(--mu)}
+.cinf-monto input,.cinf-espejo{font-family:var(--font-display);font-weight:600;font-size:var(--fs-h2);letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.15}
+.cinf-monto input{width:7ch;min-width:2ch;max-width:100%;border:0;background:transparent;color:var(--ink);text-align:right;padding:0;border-radius:0}
+.cinf-monto input:focus{outline:none}
+.cinf-monto:focus-within{border-bottom-color:var(--acc);box-shadow:0 1px 0 var(--acc)}
+.cinf-espejo{position:absolute;visibility:hidden;white-space:pre;pointer-events:none}
+.cinf-monto-b{justify-content:flex-start}
+.cinf-monto-b .cinf-sim{font-size:var(--fs-h4)}
+.cinf-monto-b input,.cinf-monto-b .cinf-espejo{font-size:var(--fs-h3)}
+.cinf-monto-b input{text-align:left}
+
+/* 01 · Índice de temas y lista de destinos */
+.cinf-ver{margin:0 0 4px;font-size:var(--fs-15);line-height:1.5;color:var(--mu)}
+.cinf-ver-et{margin-right:8px}
+.cinf-ver-i{white-space:nowrap}
+.cinf-ver button{background:none;border:0;padding:8px 0;font:inherit;cursor:pointer;color:var(--ink-soft);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--mu);text-underline-offset:5px}
+.cinf-ver button:hover{color:var(--ink);text-decoration-color:currentColor}
+.cinf-ver button[aria-pressed="true"]{color:var(--ink);font-weight:600;text-decoration:none;cursor:default}
+.cinf-sep{margin:0 9px;color:var(--mu)}
+.cinf-ledger{border:0;border-top:1px solid var(--ink);margin:12px 0 0;padding:0;min-width:0}
+.cinf-fila{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(96px,auto);gap:4px 24px;align-items:center;padding:14px 12px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background-color .15s ease}
+.cinf-fila:hover{background:var(--surface-2)}
+.cinf-fila[hidden]{display:none}
+.cinf-fila input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.cinf-fila.sel{border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);margin-top:-1px;z-index:1}
+.cinf-fila.sel:hover{background:transparent}
+.cinf-fila:has(input:focus-visible){outline:2px solid var(--acc);outline-offset:-2px}
+.cinf-prog{min-width:0}
+.cinf-prog b{display:block;font-weight:600;color:var(--ink);line-height:1.35}
+.cinf-sub{display:block;margin-top:2px;font-size:var(--fs-14);line-height:1.45;color:var(--mu)}
+.cinf-desc{display:none}
+.cinf-fila.sel .cinf-desc{display:block;margin-top:4px;font-size:var(--fs-14);line-height:1.45;color:var(--ink-soft)}
+.cinf-alc{text-align:right;min-width:0;max-width:16ch;justify-self:end;line-height:1.25}
+.cinf-alc b{display:block;font-family:var(--font-display);font-weight:600;font-size:var(--fs-h3);letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cinf-alc small{display:block;margin-top:2px;font-size:var(--fs-14);color:var(--ink-soft)}
+.cinf-falta{font-size:var(--fs-14);color:var(--mu)}
+.cinf-fila.sel .cinf-alc b{color:var(--acc)}
+.cinf-alc b.cinf-cambia{animation:cinfSube .32s var(--ease)}
+.cinf-aviso-l{margin:14px 0 0;font-size:var(--fs-15);color:var(--ink-soft)}
+.cinf-aviso-l[hidden]{display:none}
+.cinf-cambiar{display:none;margin:14px 0 0;font-size:var(--fs-15)}
+.plegado .cinf-ver,.plegado .cinf-fila:not(.sel),.plegado .cinf-aviso-l{display:none}
+.plegado .cinf-fila.sel{margin-top:0}
+.plegado .cinf-cambiar{display:inline-block}
+
+/* 02 · La cuenta */
+.cinf-cuenta{container-type:inline-size}
+.cinf-fila-monto{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px 32px;padding:2px 0 14px;border-bottom:1px solid var(--bd)}
+.cinf-et{min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:0 28px}
+.cinf-frec,.cinf-cur{display:flex;gap:0 20px}
+.cinf-frec[hidden]{display:none}
+.cinf-frec button,.cinf-cur button{position:relative;background:none;border:0;padding:0;min-height:44px;font:inherit;font-size:var(--fs-15);font-weight:500;color:var(--mu);cursor:pointer}
+.cinf-cur button{font-size:var(--fs-13);letter-spacing:.06em}
+.cinf-frec button:hover,.cinf-cur button:hover{color:var(--ink)}
+.cinf-frec button.on,.cinf-cur button.on{color:var(--ink);font-weight:600}
+.cinf-frec button.on::after,.cinf-cur button.on::after{content:"";position:absolute;left:0;right:0;bottom:8px;height:2px;background:var(--ink)}
+.cinf-campana{margin:0;font-size:var(--fs-14);color:var(--ink-soft);max-width:40ch}
+.cinf-campana[hidden]{display:none}
+.cinf-aviso,.cinf-rate{grid-column:1/-1;margin:0;font-size:var(--fs-14);color:var(--ink-soft)}
+.cinf-aviso:empty,.cinf-rate:empty{display:none}
+.cinf-sug button{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:4px 20px;width:100%;min-height:46px;padding:11px 0;background:none;border:0;border-bottom:1px solid var(--bd);text-align:left;cursor:pointer;font:inherit;font-size:var(--fs-15);color:var(--ink-soft)}
+.cinf-s-t{min-width:0}
+.cinf-s-m{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.cinf-sug button:hover{color:var(--ink)}
+.cinf-sug button[aria-pressed="true"]{color:var(--ink);font-weight:600;border-bottom:2px solid var(--ink);padding-bottom:10px}
+.cinf-uni{margin:0;padding:14px 0;font-size:var(--fs-15);line-height:1.55;color:var(--ink-soft);max-width:64ch}
+.cinf-uni b{font-weight:600;color:var(--ink)}
+.cinf-total{border-top:2px solid var(--ink);padding:22px 0 4px}
+.cinf-firma{margin:0}
+.cinf-firma[hidden]{display:none}
+.cinf-firma-n{display:block;font-family:var(--font-display);font-weight:600;font-size:clamp(34px,calc(100cqi / (var(--len,3) * .8)),84px);line-height:1;letter-spacing:-.035em;color:var(--acc);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cinf-firma-u{display:block;margin-top:12px;font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:400;font-size:var(--fs-h3);line-height:1.3;color:var(--ink);max-width:40ch;text-wrap:pretty}
+.cinf-firma.cinf-mueve .cinf-firma-n{animation:cinfSube .32s var(--ease)}
+@keyframes cinfSube{from{opacity:.35;transform:translateY(6px)}to{opacity:1;transform:none}}
+.cinf-firma-linea{margin:0;font-size:var(--fs-17);line-height:1.55;color:var(--ink);max-width:56ch}
+.cinf-firma-linea:empty{display:none}
+.cinf-firma-nota{margin:14px 0 0;font-size:var(--fs-14);line-height:1.55;color:var(--mu);max-width:64ch}
+.cinf-firma-nota:empty{display:none}
+.cinf-filas{margin:0;border-top:1px solid var(--bd)}
+.cinf-filas > div{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);gap:4px 24px;padding:13px 0;border-bottom:1px solid var(--bd)}
+.cinf-filas dt{font-size:var(--fs-14);color:var(--mu);line-height:1.5}
+.cinf-filas dd{margin:0;color:var(--ink);line-height:1.55;min-width:0}
+.cinf-filas dd small{display:block;margin-top:2px;font-size:var(--fs-14);color:var(--ink-soft);line-height:1.5}
+.cinf-incluye{margin-top:18px}
+.cinf-incluye[hidden]{display:none}
+.cinf-tier .ic-svg{width:18px;height:18px;vertical-align:-3px;color:var(--acc)}
+
+/* 03 · Confirmar */
+.cinf-frase{margin:0 0 14px;font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:var(--fs-h4);line-height:1.45;color:var(--ink);max-width:48ch}
+.cinf-frase b{font-family:"Inter",system-ui,sans-serif;font-style:normal;font-weight:600}
+.cinf-legal{margin:12px 0 0;font-size:var(--fs-13);line-height:1.5;color:var(--mu);max-width:72ch}
+.calc.cinf-pago{max-width:none;margin:24px 0 0}
+.calc.cinf-pago .calc-note{margin-top:0}
+
+@media (max-width:900px){
+  .cinf-sec,.cinf-banda{grid-template-columns:minmax(0,1fr);gap:12px}
+  .cinf-banda{gap:4px}
+  .cinf-sec{padding:20px 0 32px}
+  .cinf-lado{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:baseline}
+  .cinf-banda .cinf-lado{display:block}
+  .cinf-lado .cinf-h{margin:0}
+  .cinf-lado .cinf-nota{grid-column:1/-1;margin-top:4px}
+}
+@media (max-width:720px){
+  .cinf-banda{padding:10px 0 12px}
+  .cinf-banda-c{gap:2px 16px}
+  .cinf-sep{display:none}
+  .cinf-ver-i{margin-right:18px}
+  .cinf-fila{grid-template-columns:minmax(0,1fr) minmax(84px,auto);gap:2px 14px;padding:12px 4px}
+  .cinf-fila.sel{padding:12px 6px}
+  .cinf-fila.sel .cinf-desc{display:none}
+  .cinf-alc{max-width:13ch}
+  .cinf-fila-monto{grid-template-columns:minmax(0,1fr);gap:6px}
+  .cinf-nota-monto{display:none}
+  .cinf-monto{justify-content:flex-start}
+  .cinf-monto input{text-align:left}
+  .cinf-filas > div{grid-template-columns:minmax(0,1fr);gap:2px}
+}
+
+/* ══ LA RED COMO ÍNDICE (20 nov 2026) ════════════════════════════════════ */
+.rinf{margin-top:30px}
+.rinf-ver{border-top:2px solid var(--ink);padding-top:14px}
+.rinf-lista{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--bd)}
+.rinf-ent{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr) minmax(0,1.15fr);grid-template-areas:"cab izq prog";gap:0 40px;padding:32px 0 36px;border-bottom:1px solid var(--bd)}
+.rinf-ent[hidden]{display:none}
+.rinf-cab{grid-area:cab;min-width:0}
+.rinf-tit{display:flex;align-items:center;gap:16px}
+/* El logo va sobre el papel, sin placa: de día «multiply» borra el blanco de
+   los logos en JPG. De noche, con logos en tinta oscura, no hay forma honesta
+   de quitarlo: ahí lleva un fondo blanco mínimo. */
+.rinf-logo{flex:0 0 auto;height:52px;width:auto;max-width:88px;object-fit:contain;mix-blend-mode:multiply}
+html[data-theme="dark"] .rinf-logo{mix-blend-mode:normal;background:#fff;padding:4px 6px;border-radius:3px}
+.rinf-nom{margin:0;font-family:"Inter",system-ui,sans-serif;font-weight:600;font-size:var(--fs-h4);line-height:1.25;letter-spacing:-.01em;color:var(--ink);text-wrap:balance}
+.rinf-ins{margin:8px 0 0;font-size:var(--fs-14);line-height:1.45;color:var(--ink-soft)}
+.rinf-frase{margin:12px 0 0;font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:var(--fs-h4);line-height:1.4;color:var(--ink-soft)}
+.rinf-fig{margin:22px 0 0}
+.rinf-foto{aspect-ratio:4/3;overflow:hidden;background:var(--bds)}
+.rinf-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.rinf-fig figcaption{margin-top:8px;font-size:var(--fs-13);line-height:1.5;color:var(--mu)}
+.rinf-izq{grid-area:izq;min-width:0}
+.rinf-datos{margin:0;border-top:1px solid var(--ink)}
+.rinf-datos div{display:grid;grid-template-columns:88px minmax(0,1fr);gap:2px 14px;padding:10px 0;border-bottom:1px solid var(--bds)}
+.rinf-datos dt{font-size:var(--fs-14);color:var(--mu);line-height:1.5}
+.rinf-datos dd{margin:0;font-size:var(--fs-15);line-height:1.5;color:var(--ink-soft)}
+.rinf-pie-ent{margin:16px 0 0}
+.rinf-ficha{font-size:var(--fs-15);font-weight:600;text-decoration:none;color:var(--acc);border-bottom:1px solid currentColor;padding:8px 0 1px}
+.rinf-ficha:hover{border-bottom-width:2px}
+.rinf-prog{grid-area:prog;min-width:0}
+.rinf-mini{list-style:none;margin:0;padding:0;border-top:1px solid var(--ink)}
+.rinf-mini li[hidden]{display:none}
+.rinf-mini button{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:4px 16px;width:100%;min-height:44px;padding:12px 0;background:none;border:0;border-bottom:1px solid var(--bd);text-align:left;cursor:pointer;font:inherit;color:var(--ink)}
+.rinf-m-t b{display:block;font-weight:600;line-height:1.35}
+.rinf-m-t span{display:block;font-size:var(--fs-14);color:var(--ink-soft);line-height:1.45}
+.rinf-m-c{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rinf-m-c i{font-style:normal;margin-left:6px;color:var(--acc)}
+.rinf-mini button:hover .rinf-m-t b,.rinf-mini button:focus-visible .rinf-m-t b{text-decoration:underline;text-underline-offset:4px}
+.rinf-mas{margin:12px 0 0;font-size:var(--fs-15)}
+.rinf-sincosto{margin:0;padding-top:12px;border-top:1px solid var(--ink);font-size:var(--fs-15);line-height:1.5;color:var(--ink-soft)}
+.rinf-sincosto b{color:var(--ink)}
+.rinf-todos{margin:12px 0 0;padding-top:12px;border-top:1px solid var(--bd);font-size:var(--fs-14);line-height:1.55;color:var(--mu)}
+.rinf-vacio{margin:18px 0 0;color:var(--ink-soft)}
+.rinf-vacio[hidden]{display:none}
+.rinf-pie{margin:22px 0 0;max-width:72ch;font-size:var(--fs-14);line-height:1.55;color:var(--mu)}
+@media (max-width:1040px){
+  .rinf-ent{grid-template-columns:minmax(0,260px) minmax(0,1fr);grid-template-areas:"cab izq" "cab prog";gap:0 32px}
+  .rinf-prog{margin-top:24px}
+}
+@media (max-width:720px){
+  .rinf-ent{grid-template-columns:minmax(0,1fr);grid-template-areas:"cab" "izq" "prog";padding:28px 0}
+  .rinf-izq{margin-top:20px}
+  .rinf-prog{margin-top:22px}
+}
+@media (prefers-reduced-motion:reduce){
+  .cinf-alc b.cinf-cambia,.cinf-firma.cinf-mueve .cinf-firma-n{animation:none}
+  .cinf-fila{transition:none}
+}
