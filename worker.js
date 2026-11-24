@@ -23319,7 +23319,7 @@ function redPublicaOlvidar() { REDPUB_CACHE = null; DESTINOS_MB_CACHE = null; }
 async function mezclarUnidadesVerificadas(env, data) {
   if (!env.DB) return;
   const filas = (await env.DB.prepare(
-    "SELECT u.proyecto, u.nombre_es, u.nombre_es_pl, u.nombre_en, u.nombre_en_pl, u.costo_cop, u.incluye, u.incluye_en, u.unidad_red, i.red_id " +
+    "SELECT u.proyecto, u.nombre_es, u.nombre_es_pl, u.nombre_en, u.nombre_en_pl, u.costo_cop, u.incluye, u.incluye_en, u.unidad_red, u.tema, i.red_id " +
     "FROM unidades_impacto u JOIN inscripciones i ON i.id = u.inscripcion " +
     "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL AND u.nombre_en IS NOT NULL ORDER BY u.revisado_en, u.id"
   ).all()).results || [];
@@ -23337,6 +23337,9 @@ async function mezclarUnidadesVerificadas(env, data) {
     const u = { id, cop: f.costo_cop, es: f.nombre_es, esPl: f.nombre_es_pl, en: f.nombre_en, enPl: f.nombre_en_pl || f.nombre_en, verificada: true };
     if (f.proyecto) u.project = f.proyecto;
     if (f.incluye && f.incluye_en) u.incluye = { es: f.incluye, en: f.incluye_en };
+    /* El tema filtra la calculadora y la red (0071). Sin tema, hereda el de la
+       unidad del archivo que reemplaza (Object.assign de abajo). */
+    if (UIMP_TEMAS[f.tema]) u.tema = f.tema;
     const lista = Array.isArray(p.impactUnits) ? p.impactUnits : (p.impactUnits = []);
     const k = lista.findIndex((x) => x && x.id === id);
     if (k > -1) lista[k] = Object.assign({}, lista[k], u); else lista.push(u);
@@ -23607,6 +23610,10 @@ async function apiPortalUnidadesImpacto(request, env) {
 
 /* GET /api/admin/unidades-impacto — todas, con el bloque para partners.json
    de cada fundación que tenga vínculo con la red y unidades verificadas. */
+/* Los temas con que se filtran la calculadora y la red de #hub (0071). Los
+   mismos ids que `CALC_TEMAS` en app.js y que `tema` en data/partners.json. */
+const UIMP_TEMAS = { alimentacion: "Alimentación", educacion: "Educación y arte", agua: "Agua", emergencias: "Emergencias" };
+
 async function adminUnidadesImpacto(env) {
   if (!(await existeTabla(env, "unidades_impacto"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0060 en la base." }, 409);
   const filas = (await env.DB.prepare(
@@ -23622,10 +23629,10 @@ async function adminUnidadesImpacto(env) {
     const d = r && r.ok ? await r.json() : null;
     for (const p of (d && Array.isArray(d.partners) ? d.partners : [])) {
       if (!p || p.type !== "foundation" || !Array.isArray(p.impactUnits)) continue;
-      archivo[String(p.id).toLowerCase()] = p.impactUnits.filter((u) => u && u.id).map((u) => ({ id: u.id, es: u.es, project: u.project || "", cop: u.cop }));
+      archivo[String(p.id).toLowerCase()] = p.impactUnits.filter((u) => u && u.id).map((u) => ({ id: u.id, es: u.es, project: u.project || "", cop: u.cop, tema: u.tema || "" }));
     }
   } catch (e) { console.error("unidades del archivo", e && e.message); }
-  return json({ ok: true, estados: UIMP_ESTADO_ES, archivo,
+  return json({ ok: true, estados: UIMP_ESTADO_ES, archivo, temas: UIMP_TEMAS,
     unidades: filas.map((u) => Object.assign(u, { ver: u.actualizada, actualizada: selloCO(u.actualizada).slice(0, 16), sale_como: u.red_id ? unidadRedId(u) : null })) });
 }
 
@@ -23651,10 +23658,13 @@ async function adminUnidadImpactoDecidir(request, env, id, quien) {
     if (fila && fila.incluye && incEn.length < 3) return json({ error: "dato_invalido", campo: "incluye_en", ayuda: "Escribe en inglés qué incluye: sale en la ficha de la fundación." }, 400);
     const red = String(c.unidad_red == null ? "" : c.unidad_red).trim().toLowerCase();
     if (red && !/^[a-z0-9][a-z0-9-]{1,59}$/.test(red)) return json({ error: "dato_invalido", campo: "unidad_red", ayuda: "Ese id de unidad no es válido." }, 400);
+    /* El tema (0071): con él la unidad sale en el filtro de la calculadora y de la red. */
+    const tema = String(c.tema == null ? "" : c.tema).trim();
+    if (!UIMP_TEMAS[tema]) return json({ error: "dato_invalido", campo: "tema", ayuda: "Elige el tema: con él sale en el filtro de la calculadora y de la red." }, 400);
     r = await env.DB.prepare(
-      "UPDATE unidades_impacto SET estado = 'aprobada', nombre_en = ?, nombre_en_pl = ?, incluye_en = ?, unidad_red = ?, motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, " +
+      "UPDATE unidades_impacto SET estado = 'aprobada', nombre_en = ?, nombre_en_pl = ?, incluye_en = ?, unidad_red = ?, tema = ?, motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, " +
       "actualizada = datetime('now') WHERE id = ? AND actualizada = ? AND estado <> 'retirada'"
-    ).bind(en, enPl, incEn || null, red || null, quien || null, id, String(c.ver || "")).run();
+    ).bind(en, enPl, incEn || null, red || null, tema, quien || null, id, String(c.ver || "")).run();
     detalle = "verificada";
   } else if (c.accion === "devolver") {
     const motivo = limpiar(c.motivo, 500);
@@ -47452,6 +47462,20 @@ function uiSelectRed(u){
     arch.map(function(a){ return '<option value="' + esc(a.id) + '"' + (a.id === elegida ? " selected" : "") + ">Reemplaza a «" + esc(a.project || a.es) + "» (" + dinero(a.cop * 100, "COP") + ")</option>"; }).join("") +
     '</select><small>Reemplazarla conserva su id, que las membresías y las actas guardan como destino.</small><small id="ui-red-e" class="pn-err"></small></label>';
 }
+/* El tema con que la unidad sale en el filtro de la calculadora y de la red.
+   Se preselecciona el que ya tenía o el de la unidad del archivo que reemplaza. */
+function uiSelectTema(u){
+  var temas = (UI && UI.temas) || {};
+  var elegido = u.tema || "";
+  if (!elegido && u.red_id && UI && UI.archivo){
+    var arch = UI.archivo[String(u.red_id).toLowerCase()] || [], red = u.unidad_red || "";
+    arch.forEach(function(a){ if (!elegido && a.tema && (a.id === red || (!red && a.cop === u.costo_cop))) elegido = a.tema; });
+  }
+  return '<label class="pn-campo" id="ui-tema-c"><span>Tema en la calculadora</span><select id="ui-tema">' +
+    '<option value="">Elige un tema…</option>' +
+    Object.keys(temas).map(function(k){ return '<option value="' + esc(k) + '"' + (k === elegido ? " selected" : "") + ">" + esc(temas[k]) + "</option>"; }).join("") +
+    '</select><small>Con él sale en el filtro «Ver:» de la calculadora y de la red.</small><small id="ui-tema-e" class="pn-err"></small></label>';
+}
 function abrirUnidadImpacto(id){
   var u = ((UI && UI.unidades) || []).filter(function(x){ return String(x.id) === String(id); })[0];
   if (!u) return;
@@ -47472,7 +47496,7 @@ function abrirUnidadImpacto(id){
     pnCampo("ui-en", "Nombre en inglés, singular", u.nombre_en || "", { extra: ' maxlength="80" placeholder="' + esc("Ej.: " + "school kit") + '"' }) +
     pnCampo("ui-enpl", "Nombre en inglés, plural", u.nombre_en_pl || "", { extra: ' maxlength="90" placeholder="' + esc("Ej.: " + "school kits") + '"' }) +
     (u.incluye ? pnCampo("ui-incen", "Qué incluye, en inglés", u.incluye_en || "", { area: true, filas: 3, ayuda: "Sale en la ficha de la fundación, debajo de la calculadora." }) : "") +
-    uiSelectRed(u) +
+    uiSelectRed(u) + uiSelectTema(u) +
     '<button type="button" class="pn-b1" data-ui-decidir="aprobar">' + (verif ? "Guardar y mantener verificada" : "Marcar verificada") + "</button></div>" +
     '<div class="pn-caja ui-salida"><p class="ui-salida-t">Si algo no cuadra<small>Escribe qué falta o qué hay que corregir. La fundación lo lee en su portal y puede volver a enviarla.</small></p>' +
     pnCampo("ui-mot", "Qué falta", "", { area: true, filas: 2 }) +
@@ -47483,13 +47507,15 @@ function abrirUnidadImpacto(id){
   document.querySelectorAll("[data-ui-decidir]").forEach(function(b){
     b.addEventListener("click", function(){
       var acc = b.getAttribute("data-ui-decidir");
-      ["ui-en", "ui-enpl", "ui-incen", "ui-ver", "ui-mot"].forEach(function(k){ pnMarcar(k, ""); });
+      ["ui-en", "ui-enpl", "ui-incen", "ui-ver", "ui-mot", "ui-tema"].forEach(function(k){ pnMarcar(k, ""); });
       var c = { accion: acc, ver: u.ver, costo_verificado: document.getElementById("ui-ver").checked, nombre_en: pnValor("ui-en"), nombre_en_pl: pnValor("ui-enpl"), motivo: pnValor("ui-mot"),
-        incluye_en: document.getElementById("ui-incen") ? pnValor("ui-incen") : "", unidad_red: document.getElementById("ui-red") ? document.getElementById("ui-red").value : "" };
+        incluye_en: document.getElementById("ui-incen") ? pnValor("ui-incen") : "", unidad_red: document.getElementById("ui-red") ? document.getElementById("ui-red").value : "",
+        tema: document.getElementById("ui-tema") ? document.getElementById("ui-tema").value : "" };
       if (acc === "aprobar" && !c.costo_verificado){ pnMarcar("ui-ver", "Verifica el costo antes."); return; }
       if (acc === "aprobar" && c.nombre_en.length < 3){ pnMarcar("ui-en", "Escribe el nombre en inglés, en singular."); return; }
       if (acc === "aprobar" && c.nombre_en_pl.length < 3){ pnMarcar("ui-enpl", "Escribe el nombre en inglés, en plural."); return; }
       if (acc === "aprobar" && u.incluye && c.incluye_en.length < 3){ pnMarcar("ui-incen", "Escribe en inglés qué incluye: sale en la ficha."); return; }
+      if (acc === "aprobar" && !c.tema){ pnMarcar("ui-tema", "Elige el tema: con él sale en el filtro."); return; }
       if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("ui-mot", "Di qué falta: la fundación lo ve."); return; }
       b.disabled = true;
       postPanel("/api/admin/unidad-impacto/" + u.id, c).then(function(r){

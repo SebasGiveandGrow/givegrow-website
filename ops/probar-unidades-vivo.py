@@ -114,14 +114,27 @@ linea(st == 400 and d.get("campo") == "incluye_en", "verificar sin el inglés de
 st, d, _ = pedir("/api/admin/unidad-impacto/5", {"accion": "aprobar", "ver": ver, "costo_verificado": True,
                                                   "nombre_en": "one-month scholarship", "nombre_en_pl": "one-month scholarships",
                                                   "incluye_en": "Tuition and transport", "unidad_red": "ndf-beca"})
-linea(st == 200, "verificar con el inglés y reemplazando a ndf-beca responde 200")
+linea(st == 400 and d.get("campo") == "tema", "verificar sin tema se rechaza (0071)")
+st, d, _ = pedir("/api/admin/unidad-impacto/5", {"accion": "aprobar", "ver": ver, "costo_verificado": True,
+                                                  "nombre_en": "one-month scholarship", "nombre_en_pl": "one-month scholarships",
+                                                  "incluye_en": "Tuition and transport", "unidad_red": "ndf-beca", "tema": "deportes"})
+linea(st == 400 and d.get("campo") == "tema", "un tema que no existe se rechaza")
+st, d, _ = pedir("/api/admin/unidad-impacto/5", {"accion": "aprobar", "ver": ver, "costo_verificado": True,
+                                                  "nombre_en": "one-month scholarship", "nombre_en_pl": "one-month scholarships",
+                                                  "incluye_en": "Tuition and transport", "unidad_red": "ndf-beca", "tema": "educacion"})
+linea(st == 200, "verificar con el inglés, el tema y reemplazando a ndf-beca responde 200")
 st, us = unidades("ndf")
 beca = [u for u in us or [] if u["id"] == "ndf-beca"]
 linea(beca and beca[0]["cop"] == 300000 and beca[0].get("incluye", {}).get("en") == "Tuition and transport",
       "al minuto (en el mismo isolate, al instante) ndf-beca ya sale con lo verificado")
+linea(beca and beca[0].get("tema") == "educacion", "y sale con el tema que eligió el equipo")
+plato = [u for u in us or [] if u["id"] == "ndf-plato"]
+linea(plato and plato[0].get("tema") == "alimentacion", "una verificada sin tema hereda el de la unidad del archivo que reemplaza")
+st, d, _ = pedir("/api/admin/unidades-impacto")
+linea(st == 200 and (d.get("temas") or {}).get("agua") == "Agua", "el panel recibe la lista de temas para el selector")
 st, d, _ = pedir("/api/admin/unidad-impacto/3", {"accion": "aprobar", "ver": "x", "costo_verificado": True,
                                                   "nombre_en": "music class", "nombre_en_pl": "music classes",
-                                                  "incluye_en": "Teacher", "unidad_red": "NO VALE"})
+                                                  "incluye_en": "Teacher", "unidad_red": "NO VALE", "tema": "educacion"})
 linea(st == 400 and d.get("campo") == "unidad_red", "un id de unidad mal formado se rechaza")
 
 # --- la fundación edita una verificada: vuelve a revisión y deja de salir
