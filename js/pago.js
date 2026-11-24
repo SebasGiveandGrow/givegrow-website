@@ -122,8 +122,10 @@ function irAPagar(){
     return;
   }
 
-  /* El correo: Wompi lo pide de todas formas; escrito aquí, llega lleno. */
-  var correoIn = document.getElementById("pay-email");
+  /* El correo va dentro del certificado (24 nov 2026): se pide solo si lo
+     marcó, y llega ya escrito a Wompi. Sin certificado, Wompi lo pide allá. */
+  var certSi = document.getElementById("pay-cert-si");
+  var correoIn = (certSi && certSi.checked) ? document.getElementById("pay-email") : null;
   var correo = correoIn ? correoIn.value.trim() : "";
   if (correoIn && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)){
     if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.correo.err"); }

@@ -2216,8 +2216,8 @@ var I18N = {
     "calc.cur.et":"Moneda",
     "calc.gg.frase":"Fondo general de la red y atención a emergencias.",
     "pay.correo":"Tu correo",
-    "pay.correo.h":"Ahí te llegan el recibo con tu número de guía y, si lo pides, el certificado. Wompi lo recibe ya escrito.",
-    "pay.correo.err":"Escribe tu correo: ahí te llega el recibo con tu número de guía.",
+    "pay.correo.h":"Ahí te llegan el recibo y el certificado. Wompi lo recibe ya escrito.",
+    "pay.correo.err":"Escribe tu correo: ahí te llegan el recibo y el certificado.",
     "calc.sug.aria":"Montos sugeridos",
     "calc.p3.t":"Confirmar",
     "calc.p3.nota":"Revisa el resumen antes de pasar al pago.",
@@ -3884,7 +3884,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "ef3dae3d", impacto: "59c96b4d", regalos: "735e59c7", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "3b5d2f68", impacto: "59c96b4d", regalos: "735e59c7", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -4693,10 +4693,6 @@ function payRecNote(){
      Mensual tampoco aqui: /pago/metodo tiene la suya. */
   var pc = document.getElementById("pay-cert");
   if (pc) pc.style.display = (PAGO_VIA === "paypal" || calc.freq === "m") ? "none" : "";
-  /* El correo va con la misma regla: solo para el pago que sale a Wompi desde
-     aquí (mensual lo pide /pago/metodo; PayPal, su propio botón). */
-  var pco = document.getElementById("pay-correo");
-  if (pco) pco.style.display = (PAGO_VIA === "paypal" || calc.freq === "m") ? "none" : "";
   /* La franja de Donar dice solo lo que es cierto para ESTE pago. Con PayPal no
      hay certificado ni descuento (la minuta certifica pesos), y el aporte ÚNICO
      por PayPal sale por su botón alojado, que no lleva número de guía nuestro.
