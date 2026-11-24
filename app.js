@@ -2212,6 +2212,11 @@ var I18N = {
     "calc.p2.nota":"Los montos sugeridos se ajustan a lo que elegiste. También puedes escribir el tuyo.",
     "calc.freq.aria":"Frecuencia",
     "calc.cur.aria":"Moneda",
+    "calc.freq.et":"Frecuencia",
+    "calc.cur.et":"Moneda",
+    "pay.correo":"Tu correo",
+    "pay.correo.h":"Ahí te llegan el recibo con tu número de guía y, si lo pides, el certificado. Wompi lo recibe ya escrito.",
+    "pay.correo.err":"Escribe tu correo: ahí te llega el recibo con tu número de guía.",
     "calc.sug.aria":"Montos sugeridos",
     "calc.p3.t":"Confirmar",
     "calc.p3.nota":"Revisa el resumen antes de pasar al pago.",
@@ -3878,7 +3883,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "735e59c7", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "ef3dae3d", impacto: "59c96b4d", regalos: "735e59c7", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -4662,6 +4667,10 @@ function payRecNote(){
      Mensual tampoco aqui: /pago/metodo tiene la suya. */
   var pc = document.getElementById("pay-cert");
   if (pc) pc.style.display = (PAGO_VIA === "paypal" || calc.freq === "m") ? "none" : "";
+  /* El correo va con la misma regla: solo para el pago que sale a Wompi desde
+     aquí (mensual lo pide /pago/metodo; PayPal, su propio botón). */
+  var pco = document.getElementById("pay-correo");
+  if (pco) pco.style.display = (PAGO_VIA === "paypal" || calc.freq === "m") ? "none" : "";
   /* La franja de Donar dice solo lo que es cierto para ESTE pago. Con PayPal no
      hay certificado ni descuento (la minuta certifica pesos), y el aporte ÚNICO
      por PayPal sale por su botón alojado, que no lleva número de guía nuestro.
@@ -4850,7 +4859,7 @@ function calcUpdate(animar){
   /* La campaña (brigada) es una operación puntual, no una membresía: fuerza
      aporte único y esconde la frecuencia. */
   var campana = esBrigada(calc.projectId);
-  var fq = document.getElementById("calc-freq"); if (fq) fq.hidden = campana;
+  var fq = document.getElementById("calc-freq-g"); if (fq) fq.hidden = campana;
   var cn = document.getElementById("calc-campana-nota");
   if (cn){ cn.hidden = !campana; cn.textContent = campana ? t("calc.brigada.unico") : ""; }
 

@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "ecc8731f";
+const STYLES_V = "c7b2f1f9";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -611,7 +611,7 @@ function tokenNuevo() {
 /* La URL del checkout de Wompi para una guía ya guardada. La comparten la
    donación de siempre y los pedidos de regalos (que vuelven a otra pantalla:
    `vuelta` es la ruta, con su query, a la que Wompi le añade `id`). */
-async function urlCheckoutWompi(env, url, guia, centavos, vuelta) {
+async function urlCheckoutWompi(env, url, guia, centavos, vuelta, cliente) {
   const amb = ambienteWompi(env.WOMPI_PUBLIC_KEY);
   const moneda = "COP";
   /* --- firma de integridad ---
@@ -636,6 +636,17 @@ async function urlCheckoutWompi(env, url, guia, centavos, vuelta) {
      Un intento anterior de usar `url.origin` siempre rompía el pago en local. */
   const publico = url.protocol === "https:" && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname);
   p.set("redirect-url", (publico ? url.origin : ORIGIN) + vuelta);
+  /* EL CORREO (y el documento, si pidió certificado) LLEGAN YA ESCRITOS a la
+     pantalla de contacto de Wompi (23 nov 2026, pedido de Sebas): el donante
+     los escribe una vez, en Donar. Son `customer-data:*` de su checkout web y
+     no entran en la firma de integridad. Solo se PRERRELLENA: lo que valga
+     para el certificado sigue siendo lo que la pasarela confirme
+     (`identidad_pasarela`), por la misma razón que dice `guardarDonante`. */
+  if (cliente && cliente.email) p.set("customer-data:email", cliente.email);
+  if (cliente && cliente.docNum && cliente.docTipo) {
+    p.set("customer-data:legal-id", cliente.docNum);
+    p.set("customer-data:legal-id-type", ["CC", "CE", "NIT", "PP", "TI"].includes(cliente.docTipo) ? cliente.docTipo : "OTHER");
+  }
 
   return { url: amb.checkout + "?" + p.toString(), modo: amb.modo };
 }
@@ -687,6 +698,16 @@ async function apiCheckout(request, env, url) {
   /* Único momento en que sabemos con certeza en qué idioma está el donante.
      Wompi no lo entrega, así que sin esto el correo saldría siempre en español. */
   const idioma     = cuerpo.idioma === "en" ? "en" : "es";
+  /* El correo que el donante escribió en Donar: solo viaja a Wompi para que su
+     formulario llegue lleno. No se guarda aquí (el que vale es el que Wompi
+     confirme). Si viene, tiene que tener forma de correo. */
+  let correoCliente = null;
+  if (cuerpo.email != null && cuerpo.email !== "") {
+    correoCliente = String(cuerpo.email).trim().slice(0, 200);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correoCliente)) {
+      return json({ error: "correo_invalido", campo: "email", ayuda: "Revisa tu correo: ahí te llega el recibo." }, 400);
+    }
+  }
 
   if (modo === "dirigida" && !destino) return json({ error: "destino_requerido" }, 400);
 
@@ -716,7 +737,9 @@ async function apiCheckout(request, env, url) {
   ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, quiereCert, muro, nota, idioma, tokenNuevo(),
          certDatos).run();
 
-  const pago = await urlCheckoutWompi(env, url, guia, centavos, "/gracias");
+  const certPre = certDatos ? JSON.parse(certDatos) : null;
+  const pago = await urlCheckoutWompi(env, url, guia, centavos, "/gracias",
+    { email: correoCliente, docTipo: certPre && certPre.doc_tipo, docNum: certPre && certPre.doc_numero });
   return json({ guia, url: pago.url, modo: pago.modo });
 }
 
