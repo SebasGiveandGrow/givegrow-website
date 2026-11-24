@@ -302,6 +302,35 @@ todo.append(linea("reintento de la reversa: no vuelve a marcar ni a avisar",
 
 d1(f"DELETE FROM certificados WHERE numero='{num16}';")
 
+# ---- el correo escrito en Donar llega lleno a Wompi (23 nov 2026) ------------
+def checkout_crudo(payload):
+    global _N_CHECKOUT
+    _N_CHECKOUT += 1
+    cab = dict(CABECERAS)
+    cab["CF-Connecting-IP"] = "203.0.113.%d" % (_N_CHECKOUT % 250 + 1)
+    req = urllib.request.Request(BASE + "/api/checkout", data=json.dumps(payload).encode(), headers=cab, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status, json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode() or "{}")
+
+from urllib.parse import urlparse, parse_qs
+st, d = checkout_crudo({"monto": 60000, "frecuencia": "unico", "modo": "fondo", "email": "donante.correo@example.com",
+                        "certificado": True, "cert_doc_tipo": "CC", "cert_doc_numero": "1020304050", "cert_ciudad": "Medellín"})
+q = parse_qs(urlparse(d.get("url", "")).query) if st == 200 else {}
+todo.append(linea("el correo de Donar viaja como customer-data:email",
+                  q.get("customer-data:email") == ["donante.correo@example.com"], str(st)))
+todo.append(linea("con certificado, el documento viaja como legal-id y legal-id-type",
+                  q.get("customer-data:legal-id") == ["1020304050"] and q.get("customer-data:legal-id-type") == ["CC"]))
+todo.append(linea("la firma de integridad no cambia por el correo (sigue siendo de guía+monto+moneda)",
+                  len((q.get("signature:integrity") or [""])[0]) == 64))
+st, d = checkout_crudo({"monto": 60000, "frecuencia": "unico", "modo": "fondo", "email": "no-es-correo"})
+todo.append(linea("un correo sin forma de correo se rechaza", st == 400 and d.get("campo") == "email", str(st)))
+st, d = checkout_crudo({"monto": 60000, "frecuencia": "unico", "modo": "fondo"})
+q = parse_qs(urlparse(d.get("url", "")).query) if st == 200 else {}
+todo.append(linea("sin correo el checkout sigue igual que antes", st == 200 and "customer-data:email" not in q, str(st)))
+
 print()
 print(f"  {sum(todo)}/{len(todo)} pruebas en verde")
 sys.exit(0 if all(todo) else 1)

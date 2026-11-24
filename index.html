@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=ac753a4b">
+<link rel="stylesheet" href="/styles.css?v=c7b2f1f9">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=f7bda0e6" defer></script>
+<script src="/app.js?v=c22c162c" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -2491,6 +2491,13 @@
                al aporte, no a la ficha del donante: los revisa una persona antes
                de emitir. Solo con la pasarela en pesos: con PayPal no hay
                certificado (la minuta es para donaciones en COP). -->
+          <!-- EL CORREO, antes de salir a Wompi (23 nov 2026): llega ya escrito a
+               su pantalla de contacto, así que se escribe una sola vez. -->
+          <div class="pay-correo" id="pay-correo">
+            <label for="pay-email" data-i18n="pay.correo">Tu correo</label>
+            <input type="email" id="pay-email" maxlength="200" autocomplete="email" inputmode="email" spellcheck="false" aria-describedby="pay-email-h">
+            <small id="pay-email-h" data-i18n="pay.correo.h">Ahí te llegan el recibo con tu número de guía y, si lo pides, el certificado. Wompi lo recibe ya escrito.</small>
+          </div>
           <div class="pay-cert" id="pay-cert">
             <label class="pay-cert-chk"><input type="checkbox" id="pay-cert-si" data-change="payCert()"><span><b data-i18n="pay.cert">Quiero certificado de donación</b><small data-i18n="pay.cert.h">Opcional. Sirve para el descuento tributario en Colombia y lo firman el Representante Legal y la Revisora Fiscal.</small></span></label>
             <div class="pay-cert-f" id="pay-cert-f" style="display:none">

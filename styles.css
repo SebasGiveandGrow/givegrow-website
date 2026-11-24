@@ -1392,6 +1392,11 @@ html[data-theme="dark"] .prog-logo{background:#000}
    los dos temas, asi que nada de --surface ni --ink—, y los campos solo aparecen
    al marcar la casilla: quien no lo quiere no ve un formulario de mas. */
 .pay-cert{margin-top:16px}
+.pay-correo{margin-top:18px}
+.pay-correo label{display:block;font-size:var(--fs-13);font-weight:700;color:var(--on-dark-2);margin-bottom:6px}
+.pay-correo input{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:11px 12px;font-size:var(--fs-16);font-family:inherit}
+.pay-correo input:focus{outline:none;border-color:var(--on-dark-4)}
+.pay-correo small{display:block;margin-top:6px;font-size:var(--fs-13);line-height:1.45;color:var(--on-dark-4)}
 .pay-cert-chk{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-14);line-height:1.45;color:var(--on-dark-2);cursor:pointer}
 .pay-cert-chk input{margin-top:3px;flex:none;accent-color:var(--gm)}
 .pay-cert-chk small{display:block;margin-top:2px;font-size:var(--fs-13);color:var(--on-dark-4)}

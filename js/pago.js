@@ -122,6 +122,16 @@ function irAPagar(){
     return;
   }
 
+  /* El correo: Wompi lo pide de todas formas; escrito aquí, llega lleno. */
+  var correoIn = document.getElementById("pay-email");
+  var correo = correoIn ? correoIn.value.trim() : "";
+  if (correoIn && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)){
+    if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.correo.err"); }
+    correoIn.setAttribute("aria-invalid", "true"); correoIn.focus();
+    return;
+  }
+  if (correoIn) correoIn.removeAttribute("aria-invalid");
+
   var cert = payCertDatos();
   if (cert === false){
     if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.cert.err"); }
@@ -149,7 +159,8 @@ function irAPagar(){
        decía «ndf-plato» en vez del nombre del programa. */
     proyecto: etiquetaDestino(),
     nota: calc.note || null,
-    idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
+    idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es",
+    email: correo || null
   };
   if (cert){
     cuerpo.certificado = true;
