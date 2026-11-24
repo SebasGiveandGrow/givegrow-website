@@ -2214,6 +2214,7 @@ var I18N = {
     "calc.cur.aria":"Moneda",
     "calc.freq.et":"Frecuencia",
     "calc.cur.et":"Moneda",
+    "calc.gg.frase":"Fondo general de la red y atención a emergencias.",
     "pay.correo":"Tu correo",
     "pay.correo.h":"Ahí te llegan el recibo con tu número de guía y, si lo pides, el certificado. Wompi lo recibe ya escrito.",
     "pay.correo.err":"Escribe tu correo: ahí te llega el recibo con tu número de guía.",
@@ -4434,26 +4435,38 @@ function cinfUnidad(u, n){
   s = s.charAt(0).toLowerCase() + s.slice(1); p = p.charAt(0).toLowerCase() + p.slice(1);
   return n === 1 ? s : p;
 }
-function cinfDestinos(){
-  var d = [];
-  d.push({ id:"general", tema:null, nombre:t("calc.dest.general"), sub:t("calc.dest.general.sub"), desc:t("calc.dest.general.desc"), para:t("calc.para.general"), partner:"" });
-  d.push({ id:BRIGADA.id, tema:"emergencias", nombre:t("calc.dest.brigada"), sub:"Give&Grow", desc:t("calc.dest.brigada.desc"), para:t("calc.para.brigada"), partner:"" });
-  d.push({ id:MMC_DESTINO.id, tema:"emergencias", nombre:t("calc.dest.mmc"), sub:"Give&Grow", desc:t("calc.dest.mmc.desc"), para:t("calc.para.mmc"), partner:"", sinCosto:t("calc.mmc.sincosto") });
-  var ps = (PARTNERS_DATA || PARTNERS_FALLBACK || []).filter(function(p){ return p.type==="foundation" && p.impactUnits && p.impactUnits.length; });
-  for (var i=0;i<ps.length;i++){
-    for (var k=0;k<ps[i].impactUnits.length;k++){
-      var u = ps[i].impactUnits[k]; if (!u || !u.id || !(u.cop > 0)) continue;
-      d.push({ id:u.id, tema:(CALC_TEMAS.indexOf(u.tema)>=0 ? u.tema : null), nombre:u.project || cinfSinParen(u[lang]||u.es),
-               fund:ps[i].name, partner:ps[i].id, u:u, cop:u.cop, i:d.length });
-    }
+/* La lista va AGRUPADA POR QUIEN EJECUTA (24 nov 2026, pedido de Sebas): primero
+   Give&Grow (fondo general, brigada, Mira Mi Casa) y después cada fundación en
+   orden alfabético, con su logo, su nombre y su frase. Cada programa lleva su
+   logo propio si la fundación lo publicó en `profile.programs[].logo`; si no,
+   el de la fundación. */
+var CALC_GRUPOS = [];
+function cinfLogoPrograma(p, u){
+  var progs = (p.profile && p.profile.programs) || [], nom = String(u.project || "").toLowerCase();
+  for (var i=0;i<progs.length;i++){
+    var n = progs[i] && progs[i].name, nn = String(typeof n === "string" ? n : (n && (n.es || n.en)) || "").toLowerCase();
+    if (nom && nn === nom && progs[i].logo) return progs[i].logo;
   }
-  /* Orden: el fondo general; los temas con costo publicado; los de monto abierto; sin tema al final. */
-  var orden = {}; CALC_TEMAS.forEach(function(x,i){ orden[x] = i+1; });
-  d.forEach(function(x,i){ x.i = i; });
-  d.sort(function(a,b){
-    var ta = a.id==="general" ? 0 : (a.tema ? orden[a.tema] : 99), tb = b.id==="general" ? 0 : (b.tema ? orden[b.tema] : 99);
-    return ta !== tb ? ta - tb : a.i - b.i;
-  });
+  return (p.logo && canShowLogo(p)) ? p.logo : "";
+}
+function cinfDestinos(){
+  var d = [], gg = "/img/icon/gg-192.png";
+  CALC_GRUPOS = [{ id:"gg", nombre:"Give&Grow", frase:t("calc.gg.frase"), logo:gg }];
+  d.push({ id:"general", grupo:"gg", logo:gg, tema:null, nombre:t("calc.dest.general"), sub:t("calc.dest.general.desc"), para:t("calc.para.general"), partner:"" });
+  d.push({ id:BRIGADA.id, grupo:"gg", logo:gg, tema:"emergencias", nombre:t("calc.dest.brigada"), sub:t("calc.dest.brigada.desc"), para:t("calc.para.brigada"), partner:"" });
+  d.push({ id:MMC_DESTINO.id, grupo:"gg", logo:"/img/icon/mmc-192.png", tema:"emergencias", nombre:t("calc.dest.mmc"), sub:t("calc.dest.mmc.desc"), para:t("calc.para.mmc"), partner:"", sinCosto:t("calc.mmc.sincosto") });
+  var ps = (PARTNERS_DATA || PARTNERS_FALLBACK || []).filter(function(p){ return p.type==="foundation" && p.impactUnits && p.impactUnits.length; })
+             .sort(function(a,b){ return String(a.name).localeCompare(String(b.name), "es"); });
+  for (var i=0;i<ps.length;i++){
+    var p = ps[i], pr = p.profile || {}, n = 0;
+    for (var k=0;k<p.impactUnits.length;k++){
+      var u = p.impactUnits[k]; if (!u || !u.id || !(u.cop > 0)) continue;
+      d.push({ id:u.id, grupo:p.id, logo:cinfLogoPrograma(p, u), tema:(CALC_TEMAS.indexOf(u.tema)>=0 ? u.tema : null),
+               nombre:u.project || cinfSinParen(u[lang]||u.es), fund:p.name, partner:p.id, u:u, cop:u.cop });
+      n++;
+    }
+    if (n) CALC_GRUPOS.push({ id:p.id, nombre:p.name, frase:redTxt(pr.tagline) || redTxt(pr.badge), logo:(p.logo && canShowLogo(p)) ? p.logo : "" });
+  }
   return d;
 }
 /* Índice de temas: una línea de texto, sin conteos. Solo los temas que tienen algo. */
@@ -4482,16 +4495,24 @@ function buildProjectSelect(){
   if (CINF.filtro !== "todos" && temas.indexOf(CINF.filtro) < 0) CINF.filtro = "todos";
   cinfIndice(document.getElementById("calc-ver"), temas, CINF.filtro, "calc.todos", function(x){ CINF.filtro = x; CINF.plegado = false; cinfPintarLedger(); });
   var h = "";
-  CALC_DEST.forEach(function(d){
-    var sub = d.cop
-      ? escapeHtml(d.fund.replace(/^Fundaci[oó]n /,"")) + ' · <span class="cinf-num">'+escapeHtml(fmtCOP(d.cop))+'</span> '
-        + escapeHtml(t("calc.por").replace("{u}", cinfUnidad(d.u,1))) + (d.u.verificada ? ' · '+escapeHtml(t("calc.verificado")) : '')
-      : escapeHtml(d.sub);
-    h += '<label class="cinf-fila" data-id="'+escapeHtml(d.id)+'">'
-      + '<input type="radio" name="calc-destino" value="'+escapeHtml(d.id)+'">'
-      + '<span class="cinf-prog"><b>'+escapeHtml(d.nombre)+'</b><span class="cinf-sub">'+sub+'</span>'
-      + (d.desc ? '<span class="cinf-desc">'+escapeHtml(d.desc)+'</span>' : '') + '</span>'
-      + '<span class="cinf-alc"></span></label>';
+  CALC_GRUPOS.forEach(function(g){
+    var filas = CALC_DEST.filter(function(d){ return d.grupo === g.id; });
+    if (!filas.length) return;
+    h += '<div class="cinf-gr" data-grupo="'+escapeHtml(g.id)+'" role="group" aria-label="'+escapeHtml(g.nombre)+'">'
+      + '<div class="cinf-gr-cab">' + (g.logo ? '<img class="cinf-gr-logo" src="'+escapeHtml(g.logo)+'" alt="" loading="lazy">' : '')
+      + '<p class="cinf-gr-t"><b>'+escapeHtml(g.nombre)+'</b>' + (g.frase ? '<span>'+escapeHtml(g.frase)+'</span>' : '') + '</p></div>';
+    filas.forEach(function(d){
+      var sub = d.cop
+        ? '<span class="cinf-num">'+escapeHtml(fmtCOP(d.cop))+'</span> ' + escapeHtml(t("calc.por").replace("{u}", cinfUnidad(d.u,1)))
+          + (d.u.verificada ? ' · '+escapeHtml(t("calc.verificado")) : '')
+        : escapeHtml(d.sub);
+      h += '<label class="cinf-fila" data-id="'+escapeHtml(d.id)+'">'
+        + '<input type="radio" name="calc-destino" value="'+escapeHtml(d.id)+'">'
+        + (d.logo ? '<img class="cinf-fila-logo" src="'+escapeHtml(d.logo)+'" alt="" loading="lazy">' : '<span class="cinf-fila-logo" aria-hidden="true"></span>')
+        + '<span class="cinf-prog"><b>'+escapeHtml(d.nombre)+'</b><span class="cinf-sub">'+sub+'</span></span>'
+        + '<span class="cinf-alc"></span></label>';
+    });
+    h += '</div>';
   });
   led.innerHTML = h;
   led.onchange = function(e){ if (e.target && e.target.name === "calc-destino") setProject(e.target.value); };
@@ -4524,6 +4545,11 @@ function cinfPintarLedger(){
     r.hidden = !(CINF.filtro === "todos" || d.tema === CINF.filtro);
     var sel = d.id === calc.projectId;
     r.classList.toggle("sel", sel); r.querySelector("input").checked = sel;
+  });
+  /* Un grupo sin líneas visibles se esconde; plegado, solo queda el del elegido. */
+  led.querySelectorAll(".cinf-gr").forEach(function(g){
+    var vis = g.querySelector(".cinf-fila:not([hidden])"), sel = g.querySelector(".cinf-fila.sel");
+    g.hidden = !vis || (CINF.plegado && !sel);
   });
   var d = CALC_POR_ID[calc.projectId], av = document.getElementById("calc-l-aviso");
   if (av){
