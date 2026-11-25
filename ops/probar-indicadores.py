@@ -13,8 +13,19 @@ QUÉ VIGILA (puntos 30 y 31 de la lista, 24 nov 2026):
   · retirar no borra nada, así que crear y retirar en bucle tiene un tope del
     total histórico (activos + retirados) por fundación;
   · y lo de siempre: crear, medir, retirar y el tope de activos.
+
+Y lo que dejó la revisión del mismo día:
+  · si la fundación cambia el nombre, la unidad o la frecuencia mientras una
+    medición espera revisión, el panel no la aprueba con la versión vieja
+    (409 cambio_mientras_revisabas): al recargar ve el sentido nuevo, y con esa
+    versión sí la aprueba. Sin esto, el bloqueo dejaba fija una cifra con un
+    sentido que el equipo nunca vio;
+  · en las carreras, el 409 dice la causa verdadera: el «Añadir» que pierde
+    contra el tope histórico responde tope_historico (no «retira alguno»), y
+    un renombre que pierde contra un retiro responde 404, no «ya tiene
+    mediciones aprobadas».
 """
-import datetime, hashlib, json, os, re, subprocess, sys, urllib.error, urllib.request
+import datetime, hashlib, http.client, json, os, re, subprocess, sys, threading, urllib.error, urllib.parse, urllib.request
 
 BASE = os.environ.get("BASE", "http://localhost:8797")
 PERSIST = os.environ.get("PERSIST", "/tmp/gg-ind")
@@ -71,11 +82,15 @@ def entrar(inscripcion, token):
     return sc.split(";")[0]
 
 
-def guardar(cookie, **k):
+def cuerpo_guardar(**k):
     base = dict(accion="guardar", nombre="Niños que terminan el ciclo de formación", unidad="niños",
                 frecuencia="mensual", fuente="Listas de asistencia de cada sesión")
     base.update(k)
-    return pedir("/api/portal/indicadores", base, cookie)
+    return base
+
+
+def guardar(cookie, **k):
+    return pedir("/api/portal/indicadores", cuerpo_guardar(**k), cookie)
 
 
 def leer(cookie):
@@ -88,20 +103,92 @@ def fila(i):
     return r[0] if r else {}
 
 
-# El periodo mensual anterior (ya empezó) y una fecha de corte dentro de él.
+def medir(cookie, ind, periodo, corte, valor="32"):
+    st, d, _ = pedir("/api/portal/indicadores", {"accion": "medir", "indicador_id": ind, "periodo": periodo, "valor": valor,
+                                                 "fuente_detalle": "Lista de asistencia del mes", "corte": corte}, cookie)
+    return st, d
+
+
+def panel(med):
+    """La medición tal como la carga el panel (Indicadores de la red): con el
+    nombre y la unidad del indicador, y la versión (`ver`) que manda al decidir."""
+    st, d, _ = pedir("/api/admin/indicadores-red")
+    x = [m for m in d.get("mediciones", []) if m.get("id") == med]
+    return x[0] if x else {}
+
+
+def decidir(med, ver, accion="aprobar", motivo=None):
+    c = {"accion": accion, "ver": ver, "fuente_revisada": True}
+    if motivo:
+        c["motivo"] = motivo
+    st, d, _ = pedir("/api/admin/medicion-fundacion/%d" % med, c)
+    return st, d
+
+
+def estado_med(med):
+    r = sql("SELECT estado FROM mediciones_fundacion WHERE id = %d" % med)
+    return r[0]["estado"] if r else None
+
+
+def preparar(ruta, cuerpo, cookie):
+    """Un POST con la conexión YA abierta: al soltarlo solo falta mandar los
+    bytes, así varias salen de verdad juntas."""
+    u = urllib.parse.urlparse(BASE)
+    con = http.client.HTTPConnection(u.hostname, u.port, timeout=60)
+    con.connect()
+    datos = json.dumps(cuerpo).encode()
+
+    def disparar():
+        con.request("POST", ruta, body=datos, headers={"content-type": "application/json", "Origin": BASE, "Cookie": cookie})
+        r = con.getresponse()
+        b = r.read()
+        con.close()
+        try:
+            return r.status, (json.loads(b) if b else {})
+        except ValueError:
+            return r.status, {}
+    return disparar
+
+
+def a_la_vez(*tareas):
+    """Suelta las peticiones preparadas a la vez (hilos que salen de la misma
+    barrera) y devuelve sus respuestas en el mismo orden."""
+    salida = [None] * len(tareas)
+    barrera = threading.Barrier(len(tareas))
+
+    def correr(k, f):
+        barrera.wait()
+        salida[k] = f()
+    hilos = [threading.Thread(target=correr, args=(k, f)) for k, f in enumerate(tareas)]
+    for h in hilos:
+        h.start()
+    for h in hilos:
+        h.join()
+    return salida
+
+
+# El periodo mensual anterior (ya empezó) y una fecha de corte dentro de él;
+# y el de antes, para una segunda medición del mismo indicador.
 hoy = datetime.date.today()
 mes_ant = (hoy.replace(day=1) - datetime.timedelta(days=1))
 PERIODO = mes_ant.strftime("%Y-%m")
 CORTE = mes_ant.replace(day=1).isoformat()
+mes_ant2 = (mes_ant.replace(day=1) - datetime.timedelta(days=1))
+PERIODO2 = mes_ant2.strftime("%Y-%m")
+CORTE2 = mes_ant2.replace(day=1).isoformat()
 
-# --- siembra: tres fundaciones vinculadas
+# --- siembra: seis fundaciones vinculadas
 sql("DELETE FROM mediciones_fundacion; DELETE FROM indicadores_fundacion; DELETE FROM portal_sesiones; DELETE FROM portal_enlaces; "
-    "DELETE FROM inscripciones WHERE id IN (951, 952, 953);")
+    "DELETE FROM inscripciones WHERE id IN (951, 952, 953, 954, 955, 956);")
 sql("INSERT INTO inscripciones (id, tipo, estado, nombre, email, ciudad) VALUES "
     "(951, 'fundacion', 'vinculada', 'Mide', 'f951@example.com', 'Medellín'),"
     "(952, 'fundacion', 'vinculada', 'Retira mucho', 'f952@example.com', 'Bello'),"
-    "(953, 'fundacion', 'vinculada', 'Otra', 'f953@example.com', 'Itagüí')")
+    "(953, 'fundacion', 'vinculada', 'Otra', 'f953@example.com', 'Itagüí'),"
+    "(954, 'fundacion', 'vinculada', 'Cambia de sentido', 'f954@example.com', 'Envigado'),"
+    "(955, 'fundacion', 'vinculada', 'Casi llena', 'f955@example.com', 'Sabaneta'),"
+    "(956, 'fundacion', 'vinculada', 'Dos pestañas', 'f956@example.com', 'La Estrella')")
 mide, retira, otra = entrar(951, "1" * 32), entrar(952, "2" * 32), entrar(953, "3" * 32)
+cambia, llena, pestanas = entrar(954, "4" * 32), entrar(955, "5" * 32), entrar(956, "6" * 32)
 
 print("== 0. sin sesión no hay nada ==")
 st, _, _ = pedir("/api/portal/indicadores")
@@ -203,6 +290,119 @@ st, d = leer(retira)
 linea(st == 200 and d.get("indicadores") == [], "y su portal sigue cargando, sin activos")
 st, d, _ = guardar(otra, nombre="El de otra fundación")
 linea(st == 200, "el tope es por fundación: la otra sigue creando (http %s)" % st)
+
+print("\n== 8. cambiar el sentido mientras una medición espera: la aprobación se entera ==")
+# La secuencia exacta de la revisión: «niños» con 32 enviado; el panel lo
+# carga; la fundación lo guarda como «familias»; el equipo aprueba con la
+# versión que vio.
+NINOS, FAMILIAS = "Niños que terminan el ciclo de formación", "Familias con filtro de agua en uso"
+st, d, _ = guardar(cambia, nombre=NINOS, unidad="niños")
+ia = d.get("id")
+st2, d2 = medir(cambia, ia, PERIODO, CORTE, valor="32")
+ma = d2.get("id")
+linea(st == 200 and st2 == 200 and ia and ma, "crear «%s» (niños) y enviar 32 (http %s, %s)" % (NINOS, st, st2))
+p = panel(ma)
+v0 = p.get("ver")
+linea(p.get("indicador") == NINOS and p.get("unidad") == "niños" and p.get("valor") == 32 and v0,
+      "el panel carga la medición: 32 niños, con su versión (%s)" % v0)
+st, d, _ = guardar(cambia, id=ia, nombre=NINOS, unidad="niños", meta="40 niños", fuente="Listas firmadas por el profesor")
+linea(st == 200 and panel(ma).get("ver") == v0,
+      "cambiar la meta y la fuente no le cambia la versión: no tocan el sentido de la cifra (http %s)" % st)
+st, d, _ = guardar(cambia, id=ia, nombre=FAMILIAS, unidad="familias")
+linea(st == 200 and fila(ia).get("unidad") == "familias",
+      "sin nada aprobado, la fundación lo guarda como «%s» (familias) (http %s)" % (FAMILIAS, st))
+st, d = decidir(ma, v0)
+linea(st == 409 and d.get("error") == "cambio_mientras_revisabas" and estado_med(ma) == "enviada",
+      "aprobar con la versión que mostraba «niños» responde 409 cambio_mientras_revisabas y no aprueba (http %s %s)"
+      % (st, d.get("error")))
+st, d = leer(cambia)
+x = [i for i in d.get("indicadores", []) if i["id"] == ia]
+linea(x and x[0].get("bloqueado") is False, "y el indicador sigue sin bloquear (%s)" % (x and x[0].get("bloqueado")))
+p = panel(ma)
+v1 = p.get("ver")
+linea(p.get("indicador") == FAMILIAS and p.get("unidad") == "familias" and v1 and v1 != v0,
+      "al recargar, el panel ve «familias» y una versión nueva (%s → %s)" % (v0, v1))
+st, d = decidir(ma, v1)
+linea(st == 200 and estado_med(ma) == "aprobada",
+      "con la versión nueva sí se aprueba (http %s %s)" % (st, d.get("error", "")))
+st, d, _ = guardar(cambia, id=ia, nombre=NINOS, unidad="niños")
+f = fila(ia)
+linea(st == 409 and d.get("error") == "indicador_con_mediciones_aprobadas" and f.get("nombre") == FAMILIAS
+      and f.get("unidad") == "familias",
+      "aprobada, volver a «niños» responde 409: queda fijo con lo que el equipo vio (http %s)" % st)
+st, d = medir(cambia, ia, PERIODO2, CORTE2, valor="35")
+mb = d.get("id")
+u0 = panel(mb).get("ver") if mb else None
+st, d, _ = guardar(cambia, id=ia, nombre="Otra cosa que ya no se puede medir aquí", unidad="familias")
+linea(st == 409 and u0 and panel(mb).get("ver") == u0,
+      "un cambio rechazado no le toca la versión a la otra medición que espera (http %s)" % st)
+# La frecuencia cuenta igual, y una medición DEVUELTA también se puede
+# aprobar desde el panel: su versión cambia igual.
+st, d, _ = guardar(cambia, nombre="Familias que reciben el mercado del mes", unidad="familias")
+ib = d.get("id")
+st, d = medir(cambia, ib, PERIODO, CORTE, valor="12")
+mc = d.get("id")
+st, d = decidir(mc, panel(mc).get("ver"), accion="devolver", motivo="Falta la lista firmada del mes")
+w1 = panel(mc).get("ver")
+linea(st == 200 and estado_med(mc) == "devuelta" and w1, "el panel devuelve otra medición (http %s)" % st)
+st, d, _ = guardar(cambia, id=ib, nombre="Familias que reciben el mercado del mes", unidad="familias", frecuencia="trimestral")
+w2 = panel(mc).get("ver")
+st2, d2 = decidir(mc, w1)
+linea(st == 200 and w2 and w2 != w1 and st2 == 409 and d2.get("error") == "cambio_mientras_revisabas"
+      and estado_med(mc) == "devuelta",
+      "cambiar solo la frecuencia también le cambia la versión, devuelta incluida (http %s; aprobar con la vieja: %s)"
+      % (st, st2))
+
+print("\n== 9. carreras: el 409 dice la causa verdadera ==")
+# OJO: en el banco local, wrangler dev atiende estas peticiones una tras otra.
+# Medido el 24 nov 2026 contra el código de antes del arreglo: 6 «Añadir» y
+# 10 pares renombrar/retirar lanzados juntos, con la conexión ya abierta, y
+# ninguno se intercaló. Aquí las pruebas «a la vez» vigilan el invariante;
+# el camino de la carrera lo recorren igual las deterministas, porque el
+# worker ya no decide con una lectura previa: decide la escritura, y cuando
+# no escribe, mira por qué (el tope de la sección 7, el retirado de abajo).
+#
+# (a) 59 entre activos y retirados, y solo 3 activos: seis «Añadir» a la vez.
+# Cabe uno; los otros cinco chocan con el tope HISTÓRICO, y «retira alguno»
+# sería un consejo falso: retirar no baja ese total.
+sql("WITH RECURSIVE n(k) AS (SELECT 1 UNION ALL SELECT k + 1 FROM n WHERE k < %d) "
+    "INSERT INTO indicadores_fundacion (inscripcion, nombre, frecuencia, fuente, estado) "
+    "SELECT 955, 'Sembrado ' || k, 'mensual', 'Listas de asistencia', CASE WHEN k <= 3 THEN 'activo' ELSE 'retirado' END FROM n"
+    % (TOPE_HISTORICO - 1))
+r = a_la_vez(*[preparar("/api/portal/indicadores", cuerpo_guardar(nombre="Añadido a la vez, número %d" % k), llena)
+               for k in range(6)])
+res = sorted((x[0], x[1].get("error", "")) for x in r)
+total = sql("SELECT COUNT(*) AS n FROM indicadores_fundacion WHERE inscripcion = 955")[0]["n"]
+linea(res == [(200, "")] + [(409, "tope_historico")] * 5 and total == TOPE_HISTORICO,
+      "con 59 y 3 activos, de seis a la vez entra uno y los otros cinco dicen tope_historico (%s; total %s)" % (res, total))
+# (b) Renombrar uno que ya no está activo es 404, no «ya tiene mediciones
+# aprobadas»: no tiene ninguna. Es la misma rama que toma un renombre cuando
+# otra pestaña lo retira entre la lectura y la escritura.
+st, d, _ = guardar(pestanas, nombre="Indicador que se retira antes")
+ir_ = d.get("id")
+st2, _, _ = pedir("/api/portal/indicadores", {"accion": "retirar", "id": ir_}, pestanas)
+st3, d3, _ = guardar(pestanas, id=ir_, nombre="Renombrado después de retirarlo")
+linea(st == 200 and st2 == 200 and st3 == 404 and d3.get("error") == "no_encontrado"
+      and fila(ir_).get("nombre") == "Indicador que se retira antes",
+      "renombrar uno ya retirado responde 404 no_encontrado (http %s %s)" % (st3, d3.get("error")))
+# Y lo mismo con las dos pestañas a la vez: una renombra, la otra retira. La
+# única respuesta honesta es 200 (llegó antes) o 404 (ya no está activo).
+vueltas = []
+for k in range(10):
+    st, d, _ = guardar(pestanas, nombre="Indicador de la vuelta %d" % k)
+    ic = d.get("id")
+    if st != 200 or not ic:
+        vueltas.append((ic, k, st, "no se creó", 0))
+        continue
+    (st1, d1), (st2, _) = a_la_vez(
+        preparar("/api/portal/indicadores", cuerpo_guardar(id=ic, nombre="Renombrado en la vuelta %d" % k), pestanas),
+        preparar("/api/portal/indicadores", {"accion": "retirar", "id": ic}, pestanas))
+    vueltas.append((ic, k, st1, d1.get("error", ""), st2))
+filas = {x["id"]: x for x in sql("SELECT id, nombre, estado FROM indicadores_fundacion WHERE inscripcion = 956")}
+linea(all(st1 in (200, 404) and st2 == 200 and filas.get(ic, {}).get("estado") == "retirado"
+          and (filas.get(ic, {}).get("nombre") == "Renombrado en la vuelta %d" % k) == (st1 == 200)
+          for ic, k, st1, _, st2 in vueltas),
+      "renombrar contra retirar a la vez: 200 si llegó antes, 404 si no, nunca 409 (%s)" % [(v[2], v[3]) for v in vueltas])
 
 print("\n== resumen ==")
 print("%d ok · %d fallos" % (okc, failc))

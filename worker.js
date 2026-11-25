@@ -22753,6 +22753,13 @@ const IND_TOPE = 20;
    sin límite. Sesenta es tres veces la batería entera: alcanza para rehacerla
    un par de veces. Si una fundación de verdad necesita más, escribe al equipo. */
 const IND_TOPE_HISTORICO = 60;
+/* La versión de una medición es su `actualizado`, y el panel la manda como
+   `ver` al aprobar o devolver (adminMedicionFundacion). Cuando la fundación
+   cambia el nombre, la unidad o la frecuencia del indicador, la medición que
+   espera revisión recibe una versión nueva aunque su cifra siga igual. Como
+   datetime('now') va por segundos, dentro del mismo segundo suma uno: la
+   versión siempre cambia. */
+const MED_VERSION_NUEVA = "CASE WHEN actualizado >= datetime('now') THEN datetime(actualizado, '+1 second') ELSE datetime('now') END";
 const IND_PERIODO = {
   mensual: /^(\d{4})-(0[1-9]|1[0-2])$/,
   trimestral: /^(\d{4})-T([1-4])$/,
@@ -22854,57 +22861,78 @@ async function apiPortalIndicadores(request, env) {
     if (c.id) {
       /* Con una medición ya APROBADA, el nombre, la unidad y la frecuencia
          quedan fijos: cambiarlos reescribiría el significado de cifras que el
-         equipo ya verificó. Lo demás (fuente, línea base, meta) sí se edita. */
+         equipo ya verificó. Lo demás (fuente, línea base, meta) sí se edita.
+         Lo que decide es la escritura, que lleva la regla dentro. La lectura
+         de antes solo dice si cambia el sentido, y a propósito no mira si está
+         activo: un retirado, también uno que otra pestaña retiró después de
+         leerlo, cae en la misma rama de abajo. */
       const id = Number(c.id) || 0;
       const actual = await env.DB.prepare(
-        "SELECT id, nombre, unidad, frecuencia, " +
-        "EXISTS (SELECT 1 FROM mediciones_fundacion m WHERE m.indicador_id = indicadores_fundacion.id AND m.estado = 'aprobada') AS bloqueado " +
-        "FROM indicadores_fundacion WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+        "SELECT nombre, unidad, frecuencia FROM indicadores_fundacion WHERE id = ? AND inscripcion = ?"
       ).bind(id, s.inscripcion).first();
       if (!actual) return json({ error: "no_encontrado" }, 404);
-      const fijo = () => json({ error: "indicador_con_mediciones_aprobadas",
-        ayuda: "Este indicador ya tiene mediciones revisadas por el equipo: su nombre, su unidad y su frecuencia no se cambian. " +
-          "Si ahora mides otra cosa, retíralo y crea uno nuevo; lo ya revisado se conserva." }, 409);
-      if (actual.bloqueado) {
-        const cambia = indTexto(actual.nombre, 160) !== i.nombre || (indTexto(actual.unidad, 40) || null) !== i.unidad ||
-          String(actual.frecuencia || "") !== i.frecuencia;
-        if (cambia) return fijo();
-        const r = await env.DB.prepare(
+      const cambia = indTexto(actual.nombre, 160) !== i.nombre || (indTexto(actual.unidad, 40) || null) !== i.unidad ||
+        String(actual.frecuencia || "") !== i.frecuencia;
+      let r;
+      if (!cambia) {
+        /* El sentido se queda: da igual si hay mediciones aprobadas. */
+        r = await env.DB.prepare(
           "UPDATE indicadores_fundacion SET fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, actualizado = datetime('now') " +
           "WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
         ).bind(i.fuente, i.linea_base, i.meta, i.meta_fecha, id, s.inscripcion).run();
-        if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
-        return json({ ok: true, id });
+      } else {
+        /* Cambia el sentido. Dos sentencias en un batch (una transacción) con
+           la misma guarda:
+           · el NOT EXISTS es la regla: con una medición aprobada no se
+             renombra, tampoco si el equipo la aprobó después de la lectura;
+           · lo que espera revisión recibe versión nueva: el panel lo vio con
+             el sentido viejo, y aprobarlo con esa versión responde
+             cambio_mientras_revisabas en vez de dejar fija una cifra con un
+             sentido que el equipo nunca vio. */
+        const guarda = "indicadores_fundacion.id = ? AND indicadores_fundacion.inscripcion = ? AND indicadores_fundacion.estado = 'activo' " +
+          "AND NOT EXISTS (SELECT 1 FROM mediciones_fundacion m WHERE m.indicador_id = indicadores_fundacion.id AND m.estado = 'aprobada')";
+        r = (await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE indicadores_fundacion SET nombre = ?, unidad = ?, frecuencia = ?, fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, " +
+            "actualizado = datetime('now') WHERE " + guarda
+          ).bind(i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha, id, s.inscripcion),
+          env.DB.prepare(
+            "UPDATE mediciones_fundacion SET actualizado = " + MED_VERSION_NUEVA + " " +
+            "WHERE indicador_id = ? AND estado <> 'aprobada' AND EXISTS (SELECT 1 FROM indicadores_fundacion WHERE " + guarda + ")"
+          ).bind(id, id, s.inscripcion)
+        ]))[0];
       }
-      /* El NOT EXISTS repite la regla en la misma sentencia: si el equipo
-         aprueba una medición entre la lectura de arriba y esta escritura, no
-         se renombra nada. */
-      const r = await env.DB.prepare(
-        "UPDATE indicadores_fundacion SET nombre = ?, unidad = ?, frecuencia = ?, fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, actualizado = datetime('now') " +
-        "WHERE id = ? AND inscripcion = ? AND estado = 'activo' " +
-        "AND NOT EXISTS (SELECT 1 FROM mediciones_fundacion m WHERE m.indicador_id = indicadores_fundacion.id AND m.estado = 'aprobada')"
-      ).bind(i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha, id, s.inscripcion).run();
-      if (!r.meta || !r.meta.changes) return fijo();
-      return json({ ok: true, id });
+      if (r.meta && r.meta.changes) return json({ ok: true, id });
+      /* No se escribió nada. Si sigue activo, solo puede ser la regla: 409
+         con la explicación. Si no, ya no está (retirado, también entre la
+         lectura y la escritura): 404, no un «ya tiene mediciones aprobadas»
+         que no es cierto. */
+      const sigue = cambia && await env.DB.prepare(
+        "SELECT 1 AS si FROM indicadores_fundacion WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+      ).bind(id, s.inscripcion).first();
+      if (!sigue) return json({ error: "no_encontrado" }, 404);
+      return json({ error: "indicador_con_mediciones_aprobadas",
+        ayuda: "Este indicador ya tiene mediciones revisadas por el equipo: su nombre, su unidad y su frecuencia no se cambian. " +
+          "Si ahora mides otra cosa, retíralo y crea uno nuevo; lo ya revisado se conserva." }, 409);
     }
-    const n = await env.DB.prepare(
-      "SELECT COUNT(*) AS total, SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) AS activos FROM indicadores_fundacion WHERE inscripcion = ?"
-    ).bind(s.inscripcion).first();
-    const historico = () => json({ error: "tope_historico",
-      ayuda: "Ya llevas " + IND_TOPE_HISTORICO + " indicadores entre activos y retirados, el máximo del portal. Si necesitas añadir otro, escríbenos y lo revisamos." }, 409);
-    const activos = () => json({ error: "tope_alcanzado", ayuda: "Ya tienes " + IND_TOPE + " indicadores. Retira alguno antes de añadir otro." }, 409);
-    if (n && n.total >= IND_TOPE_HISTORICO) return historico();
-    if (n && n.activos >= IND_TOPE) return activos();
-    /* Los dos topes también dentro del INSERT: dos «Añadir» a la vez no los
-       pasan de largo. */
+    /* Los dos topes van DENTRO del INSERT, sin contar antes: dos «Añadir» a la
+       vez no los pasan de largo. Si no entra, se cuenta para decir cuál se
+       alcanzó de verdad. El total nunca baja (nada se borra): si no llega al
+       histórico, lo que faltó fue cupo de activos. Y el histórico va primero
+       porque con él retirar uno no sirve de nada. */
     const fila = await env.DB.prepare(
       "INSERT INTO indicadores_fundacion (inscripcion, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha) " +
       "SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM indicadores_fundacion WHERE inscripcion = ?) < ? " +
       "AND (SELECT COUNT(*) FROM indicadores_fundacion WHERE inscripcion = ? AND estado = 'activo') < ? RETURNING id"
     ).bind(s.inscripcion, i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha,
       s.inscripcion, IND_TOPE_HISTORICO, s.inscripcion, IND_TOPE).first();
-    if (!fila) return activos();
-    return json({ ok: true, id: fila.id });
+    if (fila) return json({ ok: true, id: fila.id });
+    const n = await env.DB.prepare("SELECT COUNT(*) AS total FROM indicadores_fundacion WHERE inscripcion = ?").bind(s.inscripcion).first();
+    if (n && n.total >= IND_TOPE_HISTORICO) {
+      return json({ error: "tope_historico",
+        ayuda: "Ya llevas " + IND_TOPE_HISTORICO + " indicadores entre activos y retirados, el máximo del portal. Si necesitas añadir otro, escríbenos y lo revisamos." }, 409);
+    }
+    return json({ error: "tope_alcanzado", ayuda: "Ya tienes " + IND_TOPE + " indicadores. Retira alguno antes de añadir otro." }, 409);
   }
 
   if (c.accion !== "medir") return json({ error: "accion_invalida" }, 400);
@@ -22991,8 +23019,10 @@ async function adminIndicadorAlinear(request, env, id, quien) {
 }
 
 /* POST /api/admin/medicion-fundacion/<id> { accion: aprobar | devolver, ver }
-   `ver` es la versión que mostró el cajón: si la fundación la reenvió
-   mientras se revisaba, no se aprueba algo distinto de lo que se vio. */
+   `ver` es la versión que mostró el cajón (su `actualizado`). Cambia si la
+   fundación reenvió la medición mientras se revisaba, y también si le cambió
+   el nombre, la unidad o la frecuencia al indicador (MED_VERSION_NUEVA): no
+   se aprueba algo distinto de lo que se vio. */
 async function adminMedicionFundacion(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -23004,7 +23034,7 @@ async function adminMedicionFundacion(request, env, id, quien) {
   ).bind(id).first();
   if (!m) return json({ error: "no_encontrado" }, 404);
   if (m.estado === "aprobada") return json({ error: "ya_aprobada", ayuda: "Ya está revisada." }, 409);
-  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación la reenvió mientras la revisabas. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
+  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación cambió la medición o su indicador mientras la revisabas. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
   let r, detalle;
   if (c.accion === "aprobar") {
     if (c.fuente_revisada !== true) return json({ error: "fuente_sin_revisar", campo: "revisada", ayuda: "Marca que revisaste la fuente (y la evidencia, si la adjuntó)." }, 400);
