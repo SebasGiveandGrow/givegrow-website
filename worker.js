@@ -21656,10 +21656,24 @@ async function portalPerfil(env, s) {
    del pie. Un tema que no esté aquí no se aplica aunque la base lo nombre. */
 const PORTAL_TEMAS = {
   adriatico: {
+    nombre: "Adriático (azul y lirios blancos)",
     color: "#2B5666",
     firma: "Este portal se vistió para ustedes: azul del Adriático y lirios blancos."
   }
 };
+
+/* Los temas como los ve el panel: id y nombre legible, para el selector de
+   Alianzas › Fundaciones. La lista sale de aquí y no se repite en el JS. */
+function portalTemasLista() {
+  return Object.keys(PORTAL_TEMAS).map((id) => ({ id, nombre: PORTAL_TEMAS[id].nombre || id }));
+}
+/* El saludo del portal: una sola línea de texto plano. Saltos de línea,
+   tabuladores y demás caracteres de control se vuelven un espacio; los
+   espacios seguidos, uno solo. Vacío → null. */
+const PORTAL_SALUDO_MAX = 160;
+function portalSaludoLimpio(v) {
+  return String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, " ").replace(/\s+/g, " ").trim();
+}
 
 /* El rol de la fundación en la red y lo que puede dar, leídos de `datos`. */
 function portalRol(s) {
@@ -22130,7 +22144,7 @@ async function adminFundaciones(env) {
   if (!(await existeTabla(env, "portal_correos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0053 en la base." }, 409);
   const red = await fundacionesRed(env);
   const filas = (await env.DB.prepare(
-    "SELECT i.id, i.nombre, i.email, i.telefono, i.ciudad, i.estado, i.red_id, i.creada_en, f.estado AS ficha, " +
+    "SELECT i.id, i.nombre, i.email, i.telefono, i.ciudad, i.estado, i.red_id, i.creada_en, i.portal_tema, i.portal_saludo, f.estado AS ficha, " +
     "(SELECT COUNT(*) FROM portal_correos c WHERE c.inscripcion = i.id) AS correos, " +
     "(SELECT MAX(COALESCE(s.ultimo_uso, s.creada)) FROM portal_sesiones s WHERE s.inscripcion = i.id) AS ultima, " +
     "(SELECT COUNT(*) FROM documentos_fundacion d WHERE d.inscripcion = i.id AND d.retirado_en IS NULL) AS docs, " +
@@ -22158,14 +22172,15 @@ async function adminFundaciones(env) {
     const m = dinero.get(id);
     return { id, nombre, recibido: m ? m.cop : 0, entregado: m ? m.entregado : 0 };
   });
-  return json({ ok: true, fundaciones, sin_solicitud: sinSolicitud, red: [...red.mapa.entries()].map(([id, nombre]) => ({ id, nombre })) });
+  return json({ ok: true, fundaciones, sin_solicitud: sinSolicitud, red: [...red.mapa.entries()].map(([id, nombre]) => ({ id, nombre })),
+    temas: portalTemasLista() });
 }
 
 /* GET /api/admin/fundacion/<id> */
 async function adminFundacion(env, id) {
   if (!(await existeTabla(env, "portal_correos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0053 en la base." }, 409);
   const i = await env.DB.prepare(
-    "SELECT i.id, i.nombre, i.email, i.telefono, i.ciudad, i.estado, i.red_id, i.datos, i.creada_en, i.tipo, " +
+    "SELECT i.id, i.nombre, i.email, i.telefono, i.ciudad, i.estado, i.red_id, i.datos, i.creada_en, i.tipo, i.portal_tema, i.portal_saludo, " +
     "f.estado AS ficha_estado, f.datos AS ficha_datos FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id WHERE i.id = ?"
   ).bind(id).first();
   if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
@@ -22181,6 +22196,8 @@ async function adminFundacion(env, id) {
     ok: true, id: i.id, nombre: i.nombre, email: i.email, telefono: i.telefono, ciudad: i.ciudad, estado: i.estado,
     red_id: i.red_id, red: [...red.mapa.entries()].map(([k, n]) => ({ id: k, nombre: n })),
     creada_en: fechaCO(i.creada_en), con_portal: PORTAL_ESTADOS.includes(i.estado),
+    portal_tema: i.portal_tema || null, portal_saludo: i.portal_saludo || null,
+    temas: portalTemasLista(), saludo_max: PORTAL_SALUDO_MAX,
     form: FUND_FORM.map((c) => ({ id: c.id, lbl: c.lbl, max: c.max, area: !!c.area, valor: form[c.id] == null ? "" : String(form[c.id]) })),
     correos: correos.map((c) => ({ email: c.email, agregado: fechaCO(c.agregado), agregado_por: c.agregado_por })),
     ods: ods.map((n) => ({ n, nombre: ODS_NOMBRES.es[n - 1] })),
@@ -22192,7 +22209,7 @@ async function adminFundacion(env, id) {
   });
 }
 
-/* POST /api/admin/fundacion/<id> { accion: contacto | perfil | correo_agregar | correo_quitar } */
+/* POST /api/admin/fundacion/<id> { accion: contacto | perfil | correo_agregar | correo_quitar | portal_tema } */
 async function adminFundacionGuardar(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -22201,7 +22218,7 @@ async function adminFundacionGuardar(request, env, id, quien) {
   if (!(await existeTabla(env, "portal_correos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0053 en la base." }, 409);
   const i = await env.DB.prepare("SELECT id, tipo, datos, email FROM inscripciones WHERE id = ?").bind(id).first();
   if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
-  let detalle;
+  let detalle, extra = {};
   if (c.accion === "contacto") {
     const nombre = limpiar(c.nombre, 160);
     if (nombre.length < 2) return json({ error: "nombre_requerido", campo: "nombre", ayuda: "El nombre de la fundación no puede quedar vacío." }, 400);
@@ -22244,10 +22261,34 @@ async function adminFundacionGuardar(request, env, id, quien) {
     await env.DB.prepare("UPDATE portal_sesiones SET cerrada_en = datetime('now') WHERE inscripcion = ? AND email = ? AND cerrada_en IS NULL").bind(id, email).run();
     await env.DB.prepare("UPDATE portal_enlaces SET usado_en = datetime('now') WHERE inscripcion = ? AND lower(email) = ? AND usado_en IS NULL").bind(id, email).run();
     detalle = "correo retirado del portal: " + email;
+  } else if (c.accion === "portal_tema") {
+    /* EL PORTAL VESTIDO (0063) desde el panel, ya no desde la consola de D1.
+       Un tema que el código no conoce no se guarda: el portal lo ignoraría y
+       el panel diría otra cosa. */
+    const tema = c.tema == null || c.tema === "" ? null : c.tema;
+    if (tema !== null && (typeof tema !== "string" || !Object.prototype.hasOwnProperty.call(PORTAL_TEMAS, tema))) {
+      return json({ error: "tema_invalido", campo: "tema", ayuda: "Ese tema no existe. Elige uno de la lista o «Sin tema propio»." }, 400);
+    }
+    if (c.saludo != null && typeof c.saludo !== "string") return json({ error: "json_invalido" }, 400);
+    const saludo = portalSaludoLimpio(c.saludo);
+    if (saludo.length > PORTAL_SALUDO_MAX) {
+      return json({ error: "saludo_largo", campo: "saludo", ayuda: "El saludo tiene " + saludo.length + " caracteres; el máximo es " + PORTAL_SALUDO_MAX + "." }, 400);
+    }
+    /* SIN TOCAR actualizada_en. El tema y el saludo son cosméticos, y de esa
+       fecha cuenta la cola «Fundaciones detenidas» (aceptada sin visita +14
+       días…): moverla apagaba la alerta aunque el proceso siguiera quieto, y
+       corría la fecha de la fundación en Contactos. Quién y cuándo ya quedan
+       en la bitácora de abajo. */
+    await env.DB.prepare("UPDATE inscripciones SET portal_tema = ?, portal_saludo = ? WHERE id = ?")
+      .bind(tema, saludo || null, id).run();
+    /* El saludo puede llevar el nombre de una persona: a la bitácora va solo
+       su largo, no el texto. */
+    detalle = "portal: tema " + (tema || "ninguno") + " · " + (saludo ? "saludo de " + saludo.length + " caracteres" : "sin saludo");
+    extra = { tema, saludo: saludo || null };
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "inscripcion " + id + " · " + detalle).run();
-  return json({ ok: true });
+  return json(Object.assign({ ok: true }, extra));
 }
 
 
@@ -24075,7 +24116,10 @@ function paginaPortal(nonce) {
   .wrap{max-width:880px;margin:0 auto;padding:28px 20px 120px}
   .angosto{max-width:520px;margin:0 auto}
   h1{font-family:"Unbounded",system-ui,sans-serif;font-weight:600;font-size:26px;line-height:1.2;letter-spacing:-.01em;text-wrap:balance}
-  .saludo{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:18px;color:var(--ink-soft);margin-top:6px}
+  /* El saludo lo escribe el equipo desde el panel y puede traer un correo o una
+     dirección web: esa palabra se parte en vez de salirse. Con tema la columna
+     es angosta (100% − 440 px; en celular, − 130) y la cabecera recorta. */
+  .saludo{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:18px;color:var(--ink-soft);margin-top:6px;overflow-wrap:anywhere}
   .ey{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mu);font-weight:600}
   .sub{color:var(--mu);font-size:14px}
   .tarjeta{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px}
@@ -47062,7 +47106,8 @@ function cargarFundaciones(){
       return "<tr><td><strong>" + esc(f.nombre) + "</strong>" + (f.red_nombre ? "<br><small>en la red: " + esc(f.red_id) + "</small>" : '<br><small class="mu">sin vínculo con partners.json</small>') + "</td>" +
         "<td>" + esc(FZ_EST[f.estado] || f.estado) + "<br><small>desde " + esc(f.creada_en) + "</small></td>" +
         "<td>" + esc(f.email || "") + (f.telefono ? "<br><small>" + esc(f.telefono) + "</small>" : "") + (f.ciudad ? "<br><small>" + esc(f.ciudad) + "</small>" : "") + "</td>" +
-        "<td>" + (f.correos ? f.correos + " correo(s) más" : '<span class="mu">solo el de la solicitud</span>') + "<br><small>" + (f.ultima ? "última entrada " + esc(f.ultima) : "no ha entrado") + "</small></td>" +
+        "<td>" + (f.correos ? f.correos + " correo(s) más" : '<span class="mu">solo el de la solicitud</span>') + "<br><small>" + (f.ultima ? "última entrada " + esc(f.ultima) : "no ha entrado") + "</small>" +
+          (f.portal_tema || f.portal_saludo ? "<br><small>" + (f.portal_tema ? "tema: " + esc(fzTemaNombre(d.temas, f.portal_tema)) : "sin tema propio") + (f.portal_saludo ? " · con saludo" : "") + "</small>" : "") + "</td>" +
         "<td>" + (f.ficha === "enviada" ? "Cuestionario enviado" : f.ficha ? "Cuestionario en borrador" : '<span class="mu">Sin cuestionario</span>') +
           "<br><small>" + f.docs + " documento(s)" + esc(aviso) + "</small></td>" +
         "<td>" + (f.red_id ? dinero(f.recibido || 0, "COP") + "<br><small>entregado " + dinero(f.entregado || 0, "COP") + "</small>" : '<span class="mu">—</span>') + "</td>" +
@@ -47074,6 +47119,12 @@ function cargarFundaciones(){
       S.map(function(x){ return "<li><strong>" + esc(x.nombre) + "</strong> <small>(" + esc(x.id) + ")</small> · recibido " + dinero(x.recibido || 0, "COP") + "</li>"; }).join("") + "</ul>";
     caja.innerHTML = h;
   });
+}
+/* El nombre legible de un tema del portal; la lista viene del Worker
+   (PORTAL_TEMAS), no se repite aquí. */
+function fzTemaNombre(temas, id){
+  var t = (temas || []).filter(function(x){ return x.id === id; })[0];
+  return t ? t.nombre : id + " (el portal no lo conoce)";
 }
 function fzCampo(id, etq, valor, area, max){
   return pnCampo(id, etq, valor, area ? { area: true, filas: 4 } : { extra: ' maxlength="' + (max || 200) + '"' });
@@ -47101,6 +47152,20 @@ function abrirFundacion(id){
       }).join("") + "</ul>" : '<p class="mu">Ninguno.</p>') +
       fzCampo("fz-correo", "Agregar un correo", "", false, 160) +
       '<button type="button" class="pn-b2" id="fz-agregar">Autorizar este correo</button>';
+    /* EL PORTAL VESTIDO (0063): tema propio y saludo. Antes se asignaban desde
+       la consola de D1. */
+    var smax = d.saludo_max || 160, temas = d.temas || [];
+    var conocido = !d.portal_tema || temas.some(function(t){ return t.id === d.portal_tema; });
+    h += '<p class="pn-h3">Cómo se ve su portal</p>' +
+      '<p class="mu">Un tema propio (colores y dibujo de cabecera) y un saludo para quien abre el portal. Sin tema, sale con los colores de siempre; sin saludo, con el texto de siempre bajo el nombre.</p>' +
+      selectCampo("fz-tema", "Tema", '<option value="">Sin tema propio</option>' +
+        temas.map(function(t){ return '<option value="' + esc(t.id) + '"' + (t.id === d.portal_tema ? " selected" : "") + ">" + esc(t.nombre) + "</option>"; }).join("") +
+        (conocido ? "" : '<option value="" selected>' + esc(fzTemaNombre(temas, d.portal_tema)) + "</option>"),
+        conocido ? "" : "La base tiene un tema que el portal no aplica. Al guardar queda el que elijas aquí.") +
+      pnCampo("fz-saludo", "Saludo", d.portal_saludo || "", { extra: ' maxlength="' + smax + '"',
+        ayuda: "Una sola línea de texto plano, máximo " + smax + " caracteres. Vacío: el portal muestra su texto de siempre." }) +
+      '<p class="mu" id="fz-saludo-n" aria-live="polite"></p>' +
+      '<button type="button" class="pn-b2" id="fz-guardar-tema">Guardar tema y saludo</button>';
     if (d.perfil){
       h += '<p class="pn-h3">Perfil' + (d.perfil.por_revisar ? " · <strong>la fundación tiene cambios por revisar</strong>" : "") + "</p>" +
         '<p class="mu">Lo que guardes aquí queda como revisado. Las autorizaciones no se editan: cambian con un documento de la fundación.</p>';
@@ -47137,6 +47202,16 @@ function abrirFundacion(id){
     });
     document.getElementById("fz-agregar").addEventListener("click", function(){
       fzPost({ accion: "correo_agregar", email: pnValor("fz-correo") }, "Correo autorizado para el portal.", this);
+    });
+    var fzSal = document.getElementById("fz-saludo"), fzSalN = document.getElementById("fz-saludo-n");
+    var fzContar = function(){ fzSalN.textContent = fzSal.value.length + " de " + smax + " caracteres"; };
+    fzSal.addEventListener("input", fzContar); fzContar();
+    document.getElementById("fz-guardar-tema").addEventListener("click", function(){
+      pnMarcar("fz-saludo", "");
+      var tema = pnValor("fz-tema"), saludo = pnValor("fz-saludo");
+      if (saludo.length > smax){ pnMarcar("fz-saludo", "Máximo " + smax + " caracteres."); return; }
+      fzPost({ accion: "portal_tema", tema: tema || null, saludo: saludo },
+        "Portal guardado: " + (tema ? "tema " + fzTemaNombre(temas, tema) : "sin tema propio") + (saludo ? ", con saludo." : ", sin saludo."), this);
     });
     var gp = document.getElementById("fz-guardar-perfil");
     if (gp) gp.addEventListener("click", function(){

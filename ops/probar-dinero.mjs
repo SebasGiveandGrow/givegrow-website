@@ -86,6 +86,7 @@ const BATERIAS = [
   { nombre: "unidades-vivo", peso: 11, archivo: "ops/probar-unidades-vivo.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
   { nombre: "tarjetas", archivo: "ops/probar-tarjetas.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
   { nombre: "indicadores", archivo: "ops/probar-indicadores.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
+  { nombre: "tema-portal", archivo: "ops/probar-tema-portal.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
 ];
 
 const AYUDA = [
