@@ -23,7 +23,9 @@ Y lo que dejó la revisión del mismo día:
   · en las carreras, el 409 dice la causa verdadera: el «Añadir» que pierde
     contra el tope histórico responde tope_historico (no «retira alguno»), y
     un renombre que pierde contra un retiro responde 404, no «ya tiene
-    mediciones aprobadas».
+    mediciones aprobadas»;
+  · la versión de una medición pendiente solo avanza: reenviarla o devolverla
+    nunca la devuelve a una versión que el panel ya mostró.
 """
 import datetime, hashlib, http.client, json, os, re, subprocess, sys, threading, urllib.error, urllib.parse, urllib.request
 
@@ -177,18 +179,21 @@ mes_ant2 = (mes_ant.replace(day=1) - datetime.timedelta(days=1))
 PERIODO2 = mes_ant2.strftime("%Y-%m")
 CORTE2 = mes_ant2.replace(day=1).isoformat()
 
-# --- siembra: seis fundaciones vinculadas
-sql("DELETE FROM mediciones_fundacion; DELETE FROM indicadores_fundacion; DELETE FROM portal_sesiones; DELETE FROM portal_enlaces; "
-    "DELETE FROM inscripciones WHERE id IN (951, 952, 953, 954, 955, 956);")
+# --- siembra: siete fundaciones vinculadas
+sql("DROP TRIGGER IF EXISTS prueba_carrera_tope; "
+    "DELETE FROM mediciones_fundacion; DELETE FROM indicadores_fundacion; DELETE FROM portal_sesiones; DELETE FROM portal_enlaces; "
+    "DELETE FROM inscripciones WHERE id IN (951, 952, 953, 954, 955, 956, 957);")
 sql("INSERT INTO inscripciones (id, tipo, estado, nombre, email, ciudad) VALUES "
     "(951, 'fundacion', 'vinculada', 'Mide', 'f951@example.com', 'Medellín'),"
     "(952, 'fundacion', 'vinculada', 'Retira mucho', 'f952@example.com', 'Bello'),"
     "(953, 'fundacion', 'vinculada', 'Otra', 'f953@example.com', 'Itagüí'),"
     "(954, 'fundacion', 'vinculada', 'Cambia de sentido', 'f954@example.com', 'Envigado'),"
     "(955, 'fundacion', 'vinculada', 'Casi llena', 'f955@example.com', 'Sabaneta'),"
-    "(956, 'fundacion', 'vinculada', 'Dos pestañas', 'f956@example.com', 'La Estrella')")
+    "(956, 'fundacion', 'vinculada', 'Dos pestañas', 'f956@example.com', 'La Estrella'),"
+    "(957, 'fundacion', 'vinculada', 'Pierde la carrera', 'f957@example.com', 'Copacabana')")
 mide, retira, otra = entrar(951, "1" * 32), entrar(952, "2" * 32), entrar(953, "3" * 32)
 cambia, llena, pestanas = entrar(954, "4" * 32), entrar(955, "5" * 32), entrar(956, "6" * 32)
+carrera = entrar(957, "7" * 32)
 
 print("== 0. sin sesión no hay nada ==")
 st, _, _ = pedir("/api/portal/indicadores")
@@ -375,6 +380,28 @@ res = sorted((x[0], x[1].get("error", "")) for x in r)
 total = sql("SELECT COUNT(*) AS n FROM indicadores_fundacion WHERE inscripcion = 955")[0]["n"]
 linea(res == [(200, "")] + [(409, "tope_historico")] * 5 and total == TOPE_HISTORICO,
       "con 59 y 3 activos, de seis a la vez entra uno y los otros cinco dicen tope_historico (%s; total %s)" % (res, total))
+# (a bis) La misma carrera, forzada sin depender de cómo reparte wrangler las
+# peticiones: un trigger DE PRUEBA mete el «Añadir» que gana justo después de
+# que el que pierde pasó todos los conteos, y anula el del que pierde
+# (RAISE(IGNORE)): su INSERT no devuelve fila, como en producción cuando otro
+# entra primero. Con el código de antes, que contaba antes del INSERT y daba
+# por hecho el tope de activos, esta respondía tope_alcanzado.
+sql("WITH RECURSIVE n(k) AS (SELECT 1 UNION ALL SELECT k + 1 FROM n WHERE k < %d) "
+    "INSERT INTO indicadores_fundacion (inscripcion, nombre, frecuencia, fuente, estado) "
+    "SELECT 957, 'Sembrado ' || k, 'mensual', 'Listas de asistencia', CASE WHEN k <= 3 THEN 'activo' ELSE 'retirado' END FROM n"
+    % (TOPE_HISTORICO - 1))
+sql("CREATE TRIGGER prueba_carrera_tope BEFORE INSERT ON indicadores_fundacion "
+    "WHEN NEW.inscripcion = 957 AND NEW.nombre = 'El que pierde la carrera' BEGIN "
+    "INSERT INTO indicadores_fundacion (inscripcion, nombre, frecuencia, fuente) "
+    "VALUES (957, 'El que gana la carrera', 'mensual', 'Listas de asistencia'); "
+    "SELECT RAISE(IGNORE); END")
+st, d, _ = guardar(carrera, nombre="El que pierde la carrera")
+sql("DROP TRIGGER prueba_carrera_tope")
+nuevos = [x["nombre"] for x in sql("SELECT nombre FROM indicadores_fundacion WHERE inscripcion = 957 AND nombre LIKE 'El que %'")]
+total = sql("SELECT COUNT(*) AS n FROM indicadores_fundacion WHERE inscripcion = 957")[0]["n"]
+linea(st == 409 and d.get("error") == "tope_historico" and nuevos == ["El que gana la carrera"] and total == TOPE_HISTORICO,
+      "el que pierde la carrera contra el tope histórico oye tope_historico, no «retira alguno» (http %s %s; %s; total %s)"
+      % (st, d.get("error"), nuevos, total))
 # (b) Renombrar uno que ya no está activo es 404, no «ya tiene mediciones
 # aprobadas»: no tiene ninguna. Es la misma rama que toma un renombre cuando
 # otra pestaña lo retira entre la lectura y la escritura.
@@ -403,6 +430,29 @@ linea(all(st1 in (200, 404) and st2 == 200 and filas.get(ic, {}).get("estado") =
           and (filas.get(ic, {}).get("nombre") == "Renombrado en la vuelta %d" % k) == (st1 == 200)
           for ic, k, st1, _, st2 in vueltas),
       "renombrar contra retirar a la vez: 200 si llegó antes, 404 si no, nunca 409 (%s)" % [(v[2], v[3]) for v in vueltas])
+
+print("\n== 10. la versión de una medición pendiente solo avanza ==")
+# Un cambio de sentido dentro del mismo segundo deja la versión un segundo por
+# delante del reloj (MED_VERSION_NUEVA), y varios seguidos, unos cuantos. Aquí
+# va 30 segundos por delante. Si reenviar o devolver la escribieran con
+# datetime('now') a secas, volvería atrás, y al llegar el reloj a una versión
+# que el panel ya mostró, aprobar con esa versión vieja volvería a pasar.
+st, d, _ = guardar(cambia, nombre="Jóvenes que consiguen su primer empleo", unidad="jóvenes")
+ic = d.get("id")
+st2, d2 = medir(cambia, ic, PERIODO, CORTE, valor="7")
+md = d2.get("id")
+linea(st == 200 and st2 == 200 and ic and md, "crear otro indicador y enviar su medición (http %s, %s)" % (st, st2))
+sql("UPDATE mediciones_fundacion SET actualizado = datetime('now', '+30 seconds') WHERE id = %d" % (md or 0))
+f0 = panel(md).get("ver")
+st, d = medir(cambia, ic, PERIODO, CORTE, valor="9")
+f1 = panel(md).get("ver")
+st2, d2 = decidir(md, f0)
+linea(st == 200 and f0 and f1 and f1 > f0 and st2 == 409 and d2.get("error") == "cambio_mientras_revisabas",
+      "reenviarla la hace avanzar, no volver al reloj (%s → %s; aprobar con la vieja: %s)" % (f0, f1, st2))
+st, d = decidir(md, f1, accion="devolver", motivo="Falta la lista firmada del mes")
+f2 = panel(md).get("ver")
+linea(st == 200 and f2 and f2 > f1 and estado_med(md) == "devuelta",
+      "devolverla también la hace avanzar (%s → %s, http %s)" % (f1, f2, st))
 
 print("\n== resumen ==")
 print("%d ok · %d fallos" % (okc, failc))

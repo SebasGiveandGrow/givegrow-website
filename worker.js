@@ -22758,7 +22758,10 @@ const IND_TOPE_HISTORICO = 60;
    cambia el nombre, la unidad o la frecuencia del indicador, la medición que
    espera revisión recibe una versión nueva aunque su cifra siga igual. Como
    datetime('now') va por segundos, dentro del mismo segundo suma uno: la
-   versión siempre cambia. */
+   versión siempre cambia. Y por eso reenviar y devolver también la escriben
+   así: con datetime('now') a secas volverían atrás desde una versión que va
+   por delante del reloj, y podrían caer en una que el panel ya mostró. La
+   versión de una medición pendiente solo avanza. */
 const MED_VERSION_NUEVA = "CASE WHEN actualizado >= datetime('now') THEN datetime(actualizado, '+1 second') ELSE datetime('now') END";
 const IND_PERIODO = {
   mensual: /^(\d{4})-(0[1-9]|1[0-2])$/,
@@ -22966,7 +22969,7 @@ async function apiPortalIndicadores(request, env) {
   if (previa) {
     await env.DB.prepare(
       "UPDATE mediciones_fundacion SET valor = ?, valor_texto = ?, fuente_detalle = ?, corte = ?, evidencia_doc = ?, nota = ?, estado = 'enviada', motivo = NULL, " +
-      "revisado_en = NULL, revisado_por = NULL, actualizado = datetime('now') WHERE id = ? AND estado <> 'aprobada'"
+      "revisado_en = NULL, revisado_por = NULL, actualizado = " + MED_VERSION_NUEVA + " WHERE id = ? AND estado <> 'aprobada'"
     ).bind(valor, valorTexto, fuente, corte, evid, nota, previa.id).run();
     return json({ ok: true, id: previa.id });
   }
@@ -23047,7 +23050,7 @@ async function adminMedicionFundacion(request, env, id, quien) {
     const motivo = limpiar(c.motivo, 500);
     if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué falta: la fundación lo ve en su portal." }, 400);
     r = await env.DB.prepare(
-      "UPDATE mediciones_fundacion SET estado = 'devuelta', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') " +
+      "UPDATE mediciones_fundacion SET estado = 'devuelta', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = " + MED_VERSION_NUEVA + " " +
       "WHERE id = ? AND actualizado = ? AND estado <> 'aprobada'"
     ).bind(motivo, quien || null, id, String(c.ver || "")).run();
     detalle = "devuelta";
