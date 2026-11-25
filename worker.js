@@ -22747,6 +22747,23 @@ async function adminReporteUnidad(request, env, id, quien) {
    NADA SE PUBLICA: es seguimiento de la alianza. */
 const IND_FRECUENCIAS = { mensual: "Mensual", trimestral: "Trimestral", semestral: "Semestral", anual: "Anual" };
 const IND_TOPE = 20;
+/* El tope del TOTAL histórico (activos + retirados) de cada fundación.
+   IND_TOPE solo cuenta los activos, y retirar no borra nada (las mediciones se
+   quedan): sin este segundo tope, crear y retirar en bucle llenaría la tabla
+   sin límite. Sesenta es tres veces el tope de activos: alcanza para rehacer
+   el juego entero de indicadores un par de veces. Si una fundación de verdad
+   necesita más, escribe al equipo. */
+const IND_TOPE_HISTORICO = 60;
+/* La versión de una medición es su `actualizado`, y el panel la manda como
+   `ver` al aprobar o devolver (adminMedicionFundacion). Cuando la fundación
+   cambia el nombre, la unidad o la frecuencia del indicador, la medición que
+   espera revisión recibe una versión nueva aunque su cifra siga igual. Como
+   datetime('now') va por segundos, dentro del mismo segundo suma uno: la
+   versión siempre cambia. Y por eso reenviar y devolver también la escriben
+   así: con datetime('now') a secas volverían atrás desde una versión que va
+   por delante del reloj, y podrían caer en una que el panel ya mostró. La
+   versión de una medición pendiente solo avanza. */
+const MED_VERSION_NUEVA = "CASE WHEN actualizado >= datetime('now') THEN datetime(actualizado, '+1 second') ELSE datetime('now') END";
 const IND_PERIODO = {
   mensual: /^(\d{4})-(0[1-9]|1[0-2])$/,
   trimestral: /^(\d{4})-T([1-4])$/,
@@ -22789,9 +22806,13 @@ function indFecha(f) {
   return !isNaN(d) && d.toISOString().slice(0, 10) === s ? s : null;
 }
 
+/* La misma limpieza para lo que llega y para lo que está guardado: así la
+   comparación de «¿cambió el nombre?» no depende de un espacio de más. */
+function indTexto(v, n) { return String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n); }
+
 function indicadorValido(c) {
   const malo = (campo, ayuda) => ({ ok: false, error: "dato_invalido", campo, ayuda });
-  const texto = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const texto = indTexto;
   const i = {
     nombre: texto(c.nombre, 160), unidad: texto(c.unidad, 40) || null, frecuencia: String(c.frecuencia || ""),
     fuente: texto(c.fuente, 300), linea_base: texto(c.linea_base, 160) || null, meta: texto(c.meta, 160) || null,
@@ -22811,8 +22832,9 @@ async function apiPortalIndicadores(request, env) {
   if (!(await existeTabla(env, "indicadores_fundacion"))) return json({ error: "no_disponible" }, 503);
   if (request.method === "GET") {
     const ind = (await env.DB.prepare(
-      "SELECT id, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha, actualizado FROM indicadores_fundacion " +
-      "WHERE inscripcion = ? AND estado = 'activo' ORDER BY creado"
+      "SELECT id, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha, actualizado, " +
+      "EXISTS (SELECT 1 FROM mediciones_fundacion m WHERE m.indicador_id = indicadores_fundacion.id AND m.estado = 'aprobada') AS bloqueado " +
+      "FROM indicadores_fundacion WHERE inscripcion = ? AND estado = 'activo' ORDER BY creado"
     ).bind(s.inscripcion).all()).results || [];
     const med = (await env.DB.prepare(
       "SELECT m.id, m.indicador_id, m.periodo, m.valor, m.valor_texto, m.fuente_detalle, m.corte, m.evidencia_doc, m.nota, m.estado, m.motivo " +
@@ -22820,7 +22842,7 @@ async function apiPortalIndicadores(request, env) {
       "WHERE i.inscripcion = ? AND i.estado = 'activo' ORDER BY m.periodo DESC LIMIT 300"
     ).bind(s.inscripcion).all()).results || [];
     return json({ ok: true, frecuencias: IND_FRECUENCIAS, tope: IND_TOPE,
-      indicadores: ind.map((x) => Object.assign(x, { actualizado: fechaCO(x.actualizado) })), mediciones: med });
+      indicadores: ind.map((x) => Object.assign(x, { actualizado: fechaCO(x.actualizado), bloqueado: !!x.bloqueado })), mediciones: med });
   }
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
@@ -22841,19 +22863,80 @@ async function apiPortalIndicadores(request, env) {
     if (!v.ok) return json(v, 400);
     const i = v.i;
     if (c.id) {
-      const r = await env.DB.prepare(
-        "UPDATE indicadores_fundacion SET nombre = ?, unidad = ?, frecuencia = ?, fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, actualizado = datetime('now') " +
-        "WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
-      ).bind(i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha, Number(c.id) || 0, s.inscripcion).run();
-      if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
-      return json({ ok: true, id: Number(c.id) });
+      /* Con una medición ya APROBADA, el nombre, la unidad y la frecuencia
+         quedan fijos: cambiarlos reescribiría el significado de cifras que el
+         equipo ya verificó. Lo demás (fuente, línea base, meta) sí se edita.
+         Lo que decide es la escritura, que lleva la regla dentro. La lectura
+         de antes solo dice si cambia el sentido, y a propósito no mira si está
+         activo: un retirado, también uno que otra pestaña retiró después de
+         leerlo, cae en la misma rama de abajo. */
+      const id = Number(c.id) || 0;
+      const actual = await env.DB.prepare(
+        "SELECT nombre, unidad, frecuencia FROM indicadores_fundacion WHERE id = ? AND inscripcion = ?"
+      ).bind(id, s.inscripcion).first();
+      if (!actual) return json({ error: "no_encontrado" }, 404);
+      const cambia = indTexto(actual.nombre, 160) !== i.nombre || (indTexto(actual.unidad, 40) || null) !== i.unidad ||
+        String(actual.frecuencia || "") !== i.frecuencia;
+      let r;
+      if (!cambia) {
+        /* El sentido se queda: da igual si hay mediciones aprobadas. */
+        r = await env.DB.prepare(
+          "UPDATE indicadores_fundacion SET fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, actualizado = datetime('now') " +
+          "WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+        ).bind(i.fuente, i.linea_base, i.meta, i.meta_fecha, id, s.inscripcion).run();
+      } else {
+        /* Cambia el sentido. Dos sentencias en un batch (una transacción) con
+           la misma guarda:
+           · el NOT EXISTS es la regla: con una medición aprobada no se
+             renombra, tampoco si el equipo la aprobó después de la lectura;
+           · lo que espera revisión recibe versión nueva: el panel lo vio con
+             el sentido viejo, y aprobarlo con esa versión responde
+             cambio_mientras_revisabas en vez de dejar fija una cifra con un
+             sentido que el equipo nunca vio. */
+        const guarda = "indicadores_fundacion.id = ? AND indicadores_fundacion.inscripcion = ? AND indicadores_fundacion.estado = 'activo' " +
+          "AND NOT EXISTS (SELECT 1 FROM mediciones_fundacion m WHERE m.indicador_id = indicadores_fundacion.id AND m.estado = 'aprobada')";
+        r = (await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE indicadores_fundacion SET nombre = ?, unidad = ?, frecuencia = ?, fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, " +
+            "actualizado = datetime('now') WHERE " + guarda
+          ).bind(i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha, id, s.inscripcion),
+          env.DB.prepare(
+            "UPDATE mediciones_fundacion SET actualizado = " + MED_VERSION_NUEVA + " " +
+            "WHERE indicador_id = ? AND estado <> 'aprobada' AND EXISTS (SELECT 1 FROM indicadores_fundacion WHERE " + guarda + ")"
+          ).bind(id, id, s.inscripcion)
+        ]))[0];
+      }
+      if (r.meta && r.meta.changes) return json({ ok: true, id });
+      /* No se escribió nada. Si sigue activo, solo puede ser la regla: 409
+         con la explicación. Si no, ya no está (retirado, también entre la
+         lectura y la escritura): 404, no un «ya tiene mediciones aprobadas»
+         que no es cierto. */
+      const sigue = cambia && await env.DB.prepare(
+        "SELECT 1 AS si FROM indicadores_fundacion WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+      ).bind(id, s.inscripcion).first();
+      if (!sigue) return json({ error: "no_encontrado" }, 404);
+      return json({ error: "indicador_con_mediciones_aprobadas",
+        ayuda: "Este indicador ya tiene mediciones revisadas por el equipo: su nombre, su unidad y su frecuencia no se cambian. " +
+          "Si ahora mides otra cosa, retíralo y crea uno nuevo; lo ya revisado se conserva." }, 409);
     }
-    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM indicadores_fundacion WHERE inscripcion = ? AND estado = 'activo'").bind(s.inscripcion).first();
-    if (n && n.n >= IND_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienes " + IND_TOPE + " indicadores. Retira alguno antes de añadir otro." }, 409);
+    /* Los dos topes van DENTRO del INSERT, sin contar antes: dos «Añadir» a la
+       vez no los pasan de largo. Si no entra, se cuenta para decir cuál se
+       alcanzó de verdad. El total nunca baja (nada se borra): si no llega al
+       histórico, lo que faltó fue cupo de activos. Y el histórico va primero
+       porque con él retirar uno no sirve de nada. */
     const fila = await env.DB.prepare(
-      "INSERT INTO indicadores_fundacion (inscripcion, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
-    ).bind(s.inscripcion, i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha).first();
-    return json({ ok: true, id: fila.id });
+      "INSERT INTO indicadores_fundacion (inscripcion, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha) " +
+      "SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM indicadores_fundacion WHERE inscripcion = ?) < ? " +
+      "AND (SELECT COUNT(*) FROM indicadores_fundacion WHERE inscripcion = ? AND estado = 'activo') < ? RETURNING id"
+    ).bind(s.inscripcion, i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha,
+      s.inscripcion, IND_TOPE_HISTORICO, s.inscripcion, IND_TOPE).first();
+    if (fila) return json({ ok: true, id: fila.id });
+    const n = await env.DB.prepare("SELECT COUNT(*) AS total FROM indicadores_fundacion WHERE inscripcion = ?").bind(s.inscripcion).first();
+    if (n && n.total >= IND_TOPE_HISTORICO) {
+      return json({ error: "tope_historico",
+        ayuda: "Ya llevas " + IND_TOPE_HISTORICO + " indicadores entre activos y retirados, el máximo del portal. Si necesitas añadir otro, escríbenos y lo revisamos." }, 409);
+    }
+    return json({ error: "tope_alcanzado", ayuda: "Ya tienes " + IND_TOPE + " indicadores. Retira alguno antes de añadir otro." }, 409);
   }
 
   if (c.accion !== "medir") return json({ error: "accion_invalida" }, 400);
@@ -22887,7 +22970,7 @@ async function apiPortalIndicadores(request, env) {
   if (previa) {
     await env.DB.prepare(
       "UPDATE mediciones_fundacion SET valor = ?, valor_texto = ?, fuente_detalle = ?, corte = ?, evidencia_doc = ?, nota = ?, estado = 'enviada', motivo = NULL, " +
-      "revisado_en = NULL, revisado_por = NULL, actualizado = datetime('now') WHERE id = ? AND estado <> 'aprobada'"
+      "revisado_en = NULL, revisado_por = NULL, actualizado = " + MED_VERSION_NUEVA + " WHERE id = ? AND estado <> 'aprobada'"
     ).bind(valor, valorTexto, fuente, corte, evid, nota, previa.id).run();
     return json({ ok: true, id: previa.id });
   }
@@ -22940,8 +23023,10 @@ async function adminIndicadorAlinear(request, env, id, quien) {
 }
 
 /* POST /api/admin/medicion-fundacion/<id> { accion: aprobar | devolver, ver }
-   `ver` es la versión que mostró el cajón: si la fundación la reenvió
-   mientras se revisaba, no se aprueba algo distinto de lo que se vio. */
+   `ver` es la versión que mostró el cajón (su `actualizado`). Cambia si la
+   fundación reenvió la medición mientras se revisaba, y también si le cambió
+   el nombre, la unidad o la frecuencia al indicador (MED_VERSION_NUEVA): no
+   se aprueba algo distinto de lo que se vio. */
 async function adminMedicionFundacion(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -22953,7 +23038,7 @@ async function adminMedicionFundacion(request, env, id, quien) {
   ).bind(id).first();
   if (!m) return json({ error: "no_encontrado" }, 404);
   if (m.estado === "aprobada") return json({ error: "ya_aprobada", ayuda: "Ya está revisada." }, 409);
-  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación la reenvió mientras la revisabas. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
+  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación cambió la medición o su indicador mientras la revisabas. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
   let r, detalle;
   if (c.accion === "aprobar") {
     if (c.fuente_revisada !== true) return json({ error: "fuente_sin_revisar", campo: "revisada", ayuda: "Marca que revisaste la fuente (y la evidencia, si la adjuntó)." }, 400);
@@ -22966,7 +23051,7 @@ async function adminMedicionFundacion(request, env, id, quien) {
     const motivo = limpiar(c.motivo, 500);
     if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué falta: la fundación lo ve en su portal." }, 400);
     r = await env.DB.prepare(
-      "UPDATE mediciones_fundacion SET estado = 'devuelta', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') " +
+      "UPDATE mediciones_fundacion SET estado = 'devuelta', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = " + MED_VERSION_NUEVA + " " +
       "WHERE id = ? AND actualizado = ? AND estado <> 'aprobada'"
     ).bind(motivo, quien || null, id, String(c.ver || "")).run();
     detalle = "devuelta";
@@ -24004,6 +24089,10 @@ function paginaPortal(nonce) {
   input[type=text],input[type=email],input[type=date],textarea,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;
     border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--ink)}
   input:focus,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:var(--acc)}
+  /* Un campo fijo (el nombre de un indicador con mediciones revisadas) no se
+     ve igual que uno editable: sin fondo, borde punteado y texto atenuado. */
+  input:disabled,textarea:disabled,select:disabled{background:transparent;border-style:dashed;color:var(--ink-soft);
+    -webkit-text-fill-color:var(--ink-soft);opacity:1;cursor:not-allowed}
   textarea{resize:vertical;min-height:96px}
   .op{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:15px;margin-top:8px}
   .op input{margin-top:4px;width:17px;height:17px;flex:0 0 auto;accent-color:var(--acc)}
@@ -24561,6 +24650,7 @@ function paginaPortal(nonce) {
       <form class="tarjeta" id="f-indicador" autocomplete="off">
         <h2 id="in-titulo">Añadir un indicador</h2>
         <input type="hidden" id="in-id">
+        <p class="sub oculto" id="in-fijo">Ya tiene mediciones revisadas por el equipo: el nombre, la unidad y la frecuencia quedan fijos para no cambiar el sentido de esas cifras. Si ahora mides otra cosa, retíralo y crea uno nuevo.</p>
         <label for="in-nombre">Qué mides *</label>
         <span class="ayuda">En una frase: «niños que asisten al menos al 80 % de los entrenamientos», «familias con filtro de agua en uso».</span>
         <input type="text" id="in-nombre" maxlength="160">
@@ -25826,6 +25916,9 @@ function formIndicador(x){
   $("in-frec").value = x ? x.frecuencia : ""; $("in-fuente").value = x ? x.fuente : "";
   $("in-base").value = x ? (x.linea_base || "") : ""; $("in-meta").value = x ? (x.meta || "") : "";
   $("in-meta-fecha").value = x ? (x.meta_fecha || "") : "";
+  var fijo = !!(x && x.bloqueado);
+  $("in-nombre").disabled = fijo; $("in-unidad").disabled = fijo; $("in-frec").disabled = fijo;
+  $("in-fijo").classList.toggle("oculto", !fijo);
   $("in-titulo").textContent = x ? "Editar «" + x.nombre + "»" : "Añadir un indicador";
   $("b-indicador").textContent = x ? "Guardar los cambios" : "Añadir";
   $("b-indicador-cancelar").classList.toggle("oculto", !x);

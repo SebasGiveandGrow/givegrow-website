@@ -49,6 +49,7 @@ const BATERIAS = [
   { nombre: "aportes-fundacion", archivo: "ops/probar-aportes-fundacion.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
   { nombre: "unidades-vivo", archivo: "ops/probar-unidades-vivo.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
   { nombre: "tarjetas", archivo: "ops/probar-tarjetas.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
+  { nombre: "indicadores", archivo: "ops/probar-indicadores.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
 ];
 
 const filtro = process.argv[2] || "";
