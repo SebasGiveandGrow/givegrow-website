@@ -13,7 +13,12 @@ no puede pasar:
   · que un saludo vacío quede como cadena vacía en vez de NULL;
   · que se le ponga tema a algo que no es una fundación;
   · que el texto del saludo (puede llevar el nombre de una persona) termine en
-    la bitácora.
+    la bitácora;
+  · que cambiar el tema o el saludo, que son cosméticos, mueva actualizada_en:
+    de esa fecha cuenta la cola «Fundaciones detenidas», y la fundación saldría
+    de «Hoy» aunque su proceso no hubiera avanzado;
+  · que una palabra larga del saludo (un correo, una dirección web) se salga de
+    su columna en la cabecera con tema, que recorta lo que sobra.
 """
 import hashlib, json, os, re, subprocess, sys, urllib.error, urllib.request
 
@@ -81,6 +86,33 @@ def en_lista(i):
 
 def guardar(i, tema, saludo):
     return pedir("/api/admin/fundacion/%d" % i, {"accion": "portal_tema", "tema": tema, "saludo": saludo})
+
+
+def actualizada(i):
+    return sql("SELECT actualizada_en FROM inscripciones WHERE id = %d" % i)[0]["actualizada_en"]
+
+
+def detenidas():
+    """La cola «Fundaciones detenidas» de /api/admin/salud y los ids que trae."""
+    st, d, _ = pedir("/api/admin/salud?items=1")
+    c = ([x for x in d.get("cola") or [] if x.get("clave") == "fundaciones_detenidas"] or [{}])[0]
+    return st, c, [x.get("id") for x in c.get("items") or []]
+
+
+def pagina(ruta):
+    try:
+        with urllib.request.urlopen(BASE + ruta) as r:
+            return r.status, r.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        return e.code, ""
+
+
+def reglas_css(html):
+    """Las reglas del <style> de una página como [(selectores, declaraciones)],
+    sin comentarios. Las de dentro de un @media salen sueltas."""
+    m = re.search(r"<style[^>]*>(.*?)</style>", html, re.S)
+    css = re.sub(r"/\*.*?\*/", "", m.group(1) if m else "", flags=re.S)
+    return [([s.strip() for s in sel.split(",")], cuerpo) for sel, cuerpo in re.findall(r"([^{}]+)\{([^{}]*)\}", css)]
 
 
 # --- siembra: una fundación con portal abierto y una empresa
@@ -156,6 +188,40 @@ st, d, _ = pedir("/api/portal/yo", cookie=cookie)
 linea(st == 200 and d.get("tema") is None and d.get("saludo") is None, "/api/portal/yo vuelve a salir sin tema ni saludo")
 st, d, f = en_lista(941)
 linea(f and f.get("portal_tema") is None and f.get("portal_saludo") is None, "y el GET de fundaciones también")
+
+# --- el tema no reinicia el reloj de «Fundaciones detenidas»
+# La cola cuenta desde actualizada_en: aceptada sin visita, más de 14 días. El
+# equipo le pone un saludo a una fundación cuya visita se atrasó y, si eso
+# moviera la fecha, la alerta se apagaba otros 14 días sin que nada avanzara.
+sql("INSERT INTO inscripciones (id, tipo, estado, nombre, email, creada_en, actualizada_en) VALUES "
+    "(943, 'fundacion', 'aceptada', 'Fundación Quieta', 'u943@example.com', datetime('now','-30 days'), datetime('now','-20 days'))")
+hace = actualizada(943)
+st, c, ids = detenidas()
+linea(st == 200 and 943 in ids and (c.get("dias") or 0) >= 20,
+      "antes: la fundación aceptada hace 20 días sin visita sale en «Fundaciones detenidas»")
+st, d, _ = guardar(943, "adriatico", "Hola, equipo.")
+linea(st == 200 and fila(943) == ("adriatico", "Hola, equipo."), "ponerle tema y saludo responde 200 y se guarda")
+linea(actualizada(943) == hace, "guardar el tema y el saludo no toca actualizada_en")
+st, c, ids = detenidas()
+linea(st == 200 and 943 in ids and (c.get("dias") or 0) >= 20,
+      "y la fundación sigue en «Fundaciones detenidas» con sus 20 días")
+st, d, _ = guardar(943, None, "")
+linea(st == 200 and fila(943) == (None, None) and actualizada(943) == hace, "quitarle tema y saludo tampoco la toca")
+
+# --- una palabra larga del saludo no se sale de su columna
+# Con tema, el saludo va en una columna de ancho fijo (100% − 440 px; en
+# celular, 100% − 130 px) dentro de una cabecera con overflow:hidden. Sin
+# overflow-wrap, un correo o una dirección web en el saludo quedaba cortado en
+# celular y en escritorio se montaba sobre los lirios. Aquí no hay navegador
+# que mida: se comprueba la regla que lo evita en la hoja que sirve /portal.
+st, html = pagina("/portal")
+rs = reglas_css(html)
+base = [cuerpo for sels, cuerpo in rs if sels == [".saludo"]]
+linea(st == 200 and len(base) == 1 and re.search(r"overflow-wrap\s*:\s*(anywhere|break-word)", base[0]),
+      "la regla base de .saludo del portal parte las palabras largas (overflow-wrap)")
+otras = [cuerpo for sels, cuerpo in rs if any(s.endswith(".saludo") for s in sels)]
+linea(len(otras) > 1 and not any(re.search(r"overflow-wrap\s*:\s*normal|word-break\s*:\s*keep-all|white-space\s*:\s*nowrap", x) for x in otras),
+      "ninguna regla del saludo con tema lo deshace")
 
 print("\n%d ok, %d fallas" % (okc, failc))
 sys.exit(1 if failc else 0)

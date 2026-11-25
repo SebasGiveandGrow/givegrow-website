@@ -22274,7 +22274,12 @@ async function adminFundacionGuardar(request, env, id, quien) {
     if (saludo.length > PORTAL_SALUDO_MAX) {
       return json({ error: "saludo_largo", campo: "saludo", ayuda: "El saludo tiene " + saludo.length + " caracteres; el máximo es " + PORTAL_SALUDO_MAX + "." }, 400);
     }
-    await env.DB.prepare("UPDATE inscripciones SET portal_tema = ?, portal_saludo = ?, actualizada_en = datetime('now') WHERE id = ?")
+    /* SIN TOCAR actualizada_en. El tema y el saludo son cosméticos, y de esa
+       fecha cuenta la cola «Fundaciones detenidas» (aceptada sin visita +14
+       días…): moverla apagaba la alerta aunque el proceso siguiera quieto, y
+       corría la fecha de la fundación en Contactos. Quién y cuándo ya quedan
+       en la bitácora de abajo. */
+    await env.DB.prepare("UPDATE inscripciones SET portal_tema = ?, portal_saludo = ? WHERE id = ?")
       .bind(tema, saludo || null, id).run();
     /* El saludo puede llevar el nombre de una persona: a la bitácora va solo
        su largo, no el texto. */
@@ -24111,7 +24116,10 @@ function paginaPortal(nonce) {
   .wrap{max-width:880px;margin:0 auto;padding:28px 20px 120px}
   .angosto{max-width:520px;margin:0 auto}
   h1{font-family:"Unbounded",system-ui,sans-serif;font-weight:600;font-size:26px;line-height:1.2;letter-spacing:-.01em;text-wrap:balance}
-  .saludo{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:18px;color:var(--ink-soft);margin-top:6px}
+  /* El saludo lo escribe el equipo desde el panel y puede traer un correo o una
+     dirección web: esa palabra se parte en vez de salirse. Con tema la columna
+     es angosta (100% − 440 px; en celular, − 130) y la cabecera recorta. */
+  .saludo{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:18px;color:var(--ink-soft);margin-top:6px;overflow-wrap:anywhere}
   .ey{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mu);font-weight:600}
   .sub{color:var(--mu);font-size:14px}
   .tarjeta{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px}
