@@ -124,7 +124,7 @@ jobs:
   #
   # EN FRAGMENTOS PARALELOS (24 nov 2026). En serie, las 11 baterías ya iban
   # por unos 8 min 12 s y cada PR con `automerge` los esperaba. Ahora cada pata
-  # de la matriz corre UN fragmento: `probar-dinero.mjs --fragmento i/N` reparte
+  # de la matriz corre UN fragmento: `probar-dinero.mjs --indice k/N` reparte
   # las baterías por su `peso` medido (greedy, la más larga primero), así que
   # una batería nueva al final de BATERIAS cae sola en alguna pata SIN tocar
   # este archivo. Para ver el reparto: `node ops/probar-dinero.mjs --listar 3`.
@@ -141,16 +141,25 @@ jobs:
   # registro dice de una vez TODO lo que se rompió, no solo lo primero.
   dinero:
     runs-on: ubuntu-latest
+    # `matrix.fragmento` es SOLO la etiqueta visible. Qué fragmento corre cada
+    # pata lo decide el paso de abajo con `strategy.job-index`, y su registro
+    # lo dice en la primera línea («· fragmento i/n (--indice k/n)»).
     name: dinero ${{ matrix.fragmento }}/${{ strategy.job-total }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        # El total (la n de i/n) sale de `strategy.job-total`, no de un 3
-        # escrito a mano: con [1, 2] y un «/3» olvidado, el fragmento 3 no lo
-        # correría nadie y todo saldría en verde. Para cambiar el número de
-        # patas basta esta lista, 1…N sin huecos. Añadir una batería NO pide
-        # tocar nada de aquí.
+        # Las patas son tantas como combinaciones tenga esta matriz, y entre
+        # todas corren todas las baterías sea cual sea su forma: el paso pasa
+        # `--indice ${{ strategy.job-index }}/${{ strategy.job-total }}`, y
+        # job-index va de 0 a job-total−1, distinto en cada pata. NO se saca
+        # de `matrix.fragmento`: con un segundo eje (`node: ["22", "24"]`)
+        # habría 6 patas corriendo 1/6, 2/6 y 3/6 dos veces, y 4/6 a 6/6 —7
+        # baterías de 11— no las correría nadie, todo en verde. Con un segundo
+        # eje cada batería corre UNA vez en total, no una por valor del eje.
+        # Para cambiar el número de patas basta esta lista. Añadir una batería
+        # NO pide tocar nada de aquí. El check #29 de validate.mjs vigila que
+        # el paso siga leyendo job-index.
         fragmento: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
@@ -161,8 +170,8 @@ jobs:
           # instalando limpio, solo que sin bajar otra vez cada paquete.
           cache: npm
       - run: npm ci
-      - name: Baterías de pagos contra un Worker local (fragmento ${{ matrix.fragmento }}/${{ strategy.job-total }})
-        run: node ops/probar-dinero.mjs --fragmento ${{ matrix.fragmento }}/${{ strategy.job-total }}
+      - name: Baterías de pagos contra un Worker local (índice ${{ strategy.job-index }} de ${{ strategy.job-total }})
+        run: node ops/probar-dinero.mjs --indice ${{ strategy.job-index }}/${{ strategy.job-total }}
 
   automerge:
     # `dinero` es requisito desde el 16 nov 2026 (decisión de Sebas): un PR con

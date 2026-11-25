@@ -7,6 +7,7 @@
    Uso:   node ops/probar-dinero.mjs                  (todas)
           node ops/probar-dinero.mjs pagos            (solo las que contengan «pagos»)
           node ops/probar-dinero.mjs --fragmento 2/3  (solo el fragmento 2 de 3)
+          node ops/probar-dinero.mjs --indice 1/3     (lo mismo, contando desde 0: es lo que usa CI)
           node ops/probar-dinero.mjs --listar 3       (muestra el reparto en 3; no corre nada)
           node ops/probar-dinero.mjs --ayuda
 
@@ -14,6 +15,15 @@
    de la matriz por fragmento (ver el job `dinero` de ci.yml). El reparto sale
    de aquí y no de ci.yml: una batería nueva añadida al final de BATERIAS cae
    sola en el fragmento menos cargado, sin tocar el workflow.
+
+   CI pasa `--indice ${{ strategy.job-index }}/${{ strategy.job-total }}` y no
+   un número de la matriz: job-index va de 0 a job-total−1 y es distinto en
+   cada pata, así que entre todas cubren los n fragmentos aunque la matriz
+   cambie de forma (un segundo eje, un `include:`, un valor repetido). Con un
+   número sacado de la matriz, un segundo eje de 2 valores daba 6 patas que
+   corrían 1/6, 2/6 y 3/6 dos veces, y nadie corría 4/6 a 6/6: 7 baterías de
+   11 fuera, todo en verde. Las expresiones de Actions no suman, por eso
+   --indice cuenta desde 0. El check #29 de validate.mjs vigila las dos cosas.
 
    Cada batería lleva `peso`: los segundos que tarda, medidos (servidor +
    batería). El reparto es el greedy de la más larga primero: se ordenan de
@@ -79,14 +89,19 @@ const BATERIAS = [
 ];
 
 const AYUDA = [
-  "Uso: node ops/probar-dinero.mjs [filtro] [--fragmento i/n] [--listar [n]]",
+  "Uso: node ops/probar-dinero.mjs [filtro] [--fragmento i/n | --indice k/n] [--listar [n]]",
   "",
   "  (sin nada)        corre todas las baterías",
   "  filtro            solo las que contengan ese texto en el nombre",
   "  --fragmento i/n   reparte las baterías en n fragmentos balanceados por",
   "                    peso (greedy, la más larga primero) y corre solo el i",
+  "                    (1 ≤ i ≤ n)",
+  "  --indice k/n      lo mismo contando desde 0 (0 ≤ k < n): el fragmento k+1.",
+  "                    Es lo que pasa CI, con strategy.job-index/job-total",
   "  --listar [n]      imprime el reparto en n fragmentos (por omisión, el n",
-  "                    de --fragmento, o 3) y sale sin correr nada",
+  "                    de --fragmento o --indice, o 3), marca con → el de",
+  "                    esta pata y dice dónde cae lo que pide el filtro; sale",
+  "                    sin correr nada",
   "  --ayuda           este mensaje",
   "",
   "Una batería sin peso cuenta " + PESO_OMISION + " s. Baterías: " + BATERIAS.map((b) => b.nombre).join(", "),
@@ -97,17 +112,20 @@ const AYUDA = [
    error con código 2, nunca un «entonces 3» callado. */
 const TOPE_FRAGMENTOS = 100;    // más patas no tiene sentido, y repartir() reserva una casilla por fragmento
 let filtro = "";
-let fragmento = null;           // { i, n }
-let listar = null;              // null = no listar; 0 = el n de --fragmento, o 3
+let fragmento = null;           // { i, n, de }: i cuenta desde 1; `de` dice cómo llegó, para el registro
+let listar = null;              // null = no listar; 0 = el n de --fragmento/--indice, o 3
 function fallaArgs(msj) { console.error(msj + "\n\n" + AYUDA); process.exit(2); }
-function leerFragmento(t) {
+/* `desde0` = --indice k/n (el fragmento k+1); si no, --fragmento i/n. */
+function leerFragmento(t, desde0) {
+  const opcion = desde0 ? "--indice" : "--fragmento";
+  if (fragmento) fallaArgs(opcion + ": ya llegó " + fragmento.de + "; una pata corre un solo fragmento");
   const m = /^(\d+)\/(\d+)$/.exec(t || "");
-  if (!m) fallaArgs("--fragmento espera i/n, por ejemplo 2/3; llegó «" + (t || "") + "»");
-  const i = Number(m[1]), n = Number(m[2]);
+  if (!m) fallaArgs(opcion + " espera " + (desde0 ? "k/n, por ejemplo 1/3" : "i/n, por ejemplo 2/3") + "; llegó «" + (t || "") + "»");
+  const i = Number(m[1]) + (desde0 ? 1 : 0), n = Number(m[2]);
   if (!(i >= 1 && i <= n && n <= TOPE_FRAGMENTOS)) {
-    fallaArgs("--fragmento fuera de rango: «" + t + "» (1 ≤ i ≤ n ≤ " + TOPE_FRAGMENTOS + ")");
+    fallaArgs(opcion + " fuera de rango: «" + t + "» (" + (desde0 ? "0 ≤ k < n" : "1 ≤ i ≤ n") + ", n ≤ " + TOPE_FRAGMENTOS + ")");
   }
-  return { i, n };
+  return { i, n, de: opcion + " " + t };
 }
 function leerListar(t) {
   const n = /^\d+$/.test(t || "") ? Number(t) : NaN;
@@ -121,10 +139,13 @@ function leerListar(t) {
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
     if (a === "--ayuda" || a === "--help" || a === "-h") { console.log(AYUDA); process.exit(0); }
-    else if (a === "--fragmento") fragmento = leerFragmento(args[++k]);
-    else if (a.startsWith("--fragmento=")) fragmento = leerFragmento(a.slice(12));
+    else if (a === "--fragmento") fragmento = leerFragmento(args[++k], false);
+    else if (a.startsWith("--fragmento=")) fragmento = leerFragmento(a.slice(12), false);
+    else if (a === "--indice") fragmento = leerFragmento(args[++k], true);
+    else if (a.startsWith("--indice=")) fragmento = leerFragmento(a.slice(9), true);
     // `--listar` solo toma el siguiente argumento si es un número: así
-    // `--listar pagos` sigue entendiéndose como listar + filtro.
+    // `--listar pagos` es listar + filtro, y el filtro se comprueba igual
+    // que al correr (abajo).
     else if (a === "--listar") listar = /^\d+$/.test(args[k + 1] || "") ? leerListar(args[++k]) : 0;
     else if (a.startsWith("--listar=")) listar = leerListar(a.slice(9));
     else if (a.startsWith("-")) fallaArgs("Opción desconocida: " + a);
@@ -155,33 +176,45 @@ function describir(lista) {
     : "ninguna");
 }
 
-if (listar !== null) {
-  const n = listar || (fragmento && fragmento.n) || 3;
-  const total = BATERIAS.reduce((s, b) => s + peso(b), 0);
-  console.log(BATERIAS.length + " baterías, ~" + total + " s en serie. Reparto en " + n + " fragmento(s):");
-  repartir(n).forEach((l, k) => console.log("  " + (k + 1) + "/" + n + "  " + describir(l)));
-  if (BATERIAS.some((b) => peso(b) !== b.peso)) console.log("  (* sin peso medido: cuenta " + PESO_OMISION + " s)");
-  process.exit(0);
-}
-
-/* Qué se corre. El filtro se mira primero contra TODAS: un nombre que no
-   existe es un error (código 2) en cualquier pata. El reparto se hace siempre
+/* El filtro se mira primero contra TODAS, antes de listar o de correr: un
+   nombre que no existe es un error (código 2) en cualquier pata y también con
+   --listar, que antes lo ignoraba y salía con 0. El reparto se hace siempre
    sobre el arreglo entero, sin filtrar, así que con el mismo filtro las n
    patas cubren entre todas lo mismo que una sola corrida sin --fragmento. */
 if (!BATERIAS.some((b) => b.nombre.includes(filtro))) {
   console.error("Ninguna batería coincide con «" + filtro + "». Hay: " + BATERIAS.map((b) => b.nombre).join(", "));
   process.exit(2);
 }
+if (listar && fragmento && listar !== fragmento.n) {
+  fallaArgs("--listar " + listar + " y " + fragmento.de + " piden repartos distintos");
+}
+
+if (listar !== null) {
+  const n = listar || (fragmento && fragmento.n) || 3;
+  const total = BATERIAS.reduce((s, b) => s + peso(b), 0);
+  const reparto = repartir(n);
+  console.log(BATERIAS.length + " baterías, ~" + total + " s en serie. Reparto en " + n + " fragmento(s):");
+  reparto.forEach((l, k) => console.log((fragmento && fragmento.i === k + 1 ? "→ " : "  ") + (k + 1) + "/" + n + "  " + describir(l)));
+  if (BATERIAS.some((b) => peso(b) !== b.peso)) console.log("  (* sin peso medido: cuenta " + PESO_OMISION + " s)");
+  if (fragmento) console.log("  (→ el fragmento de " + fragmento.de + ")");
+  if (filtro) {
+    const donde = BATERIAS.filter((b) => b.nombre.includes(filtro))
+      .map((b) => b.nombre + " en " + (reparto.findIndex((l) => l.includes(b)) + 1) + "/" + n);
+    console.log("  filtro «" + filtro + "»: " + donde.join(", "));
+  }
+  process.exit(0);
+}
+
 let elegidas = BATERIAS;
 if (fragmento) {
   elegidas = repartir(fragmento.n)[fragmento.i - 1];
-  console.log("· fragmento " + fragmento.i + "/" + fragmento.n + ": " + describir(elegidas));
+  console.log("· fragmento " + fragmento.i + "/" + fragmento.n + " (" + fragmento.de + "): " + describir(elegidas));
 }
 elegidas = elegidas.filter((b) => b.nombre.includes(filtro));
 if (!elegidas.length) {
-  // Solo pasa con --fragmento: hay más fragmentos que baterías, o las que
-  // coinciden con el filtro cayeron todas en otras patas. Esta pata no tiene
-  // nada que correr, y eso no es un fallo.
+  // Solo pasa con --fragmento o --indice: hay más fragmentos que baterías, o
+  // las que coinciden con el filtro cayeron todas en otras patas. Esta pata
+  // no tiene nada que correr, y eso no es un fallo.
   console.log("✔ nada que correr en este fragmento" + (filtro ? " con el filtro «" + filtro + "»" : ""));
   process.exit(0);
 }

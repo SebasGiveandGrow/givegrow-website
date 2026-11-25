@@ -33,7 +33,7 @@
          no se vuelve a mirar nunca. De ahí venían los siete.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { esDict, decodeHtml, eachTextNode, eachAttrNode } from "./i18n-html.mjs";
 
 let fail = 0;
@@ -2378,5 +2378,101 @@ try {
   if (fallos.length) err("check #28 · rutas con dirección propia: " + fallos.join(" · "));
   else ok("rutas con dirección propia: " + ids.length + " + /socialfest, iguales en worker.js, app.js, wrangler.toml y el sitemap; textos = ROUTE_META; ninguna privada");
 } catch (e) { err("check #28 · no se pudo revisar las rutas con dirección propia: " + e.message); }
+
+/* 29 · EL JOB `dinero` CORRE TODAS LAS BATERÍAS, SEA CUAL SEA LA FORMA DE SU MATRIZ.
+   ---------------------------------------------------------------------------
+   Desde el 24 nov 2026 `dinero` (ci.yml) es una matriz y cada pata corre un
+   fragmento de ops/probar-dinero.mjs. Si el fragmento de una pata sale de un
+   valor de la matriz, cambiarle la forma —un segundo eje, un `include:`, un
+   valor repetido— deja fragmentos que no corre nadie y TODAS las patas en
+   verde: con `node: ["22", "24"]` eran 6 patas corriendo 1/6, 2/6 y 3/6 dos
+   veces, y 7 baterías de 11 fuera. Por eso sale de `strategy.job-index`, que
+   va de 0 a job-total−1 y es distinto en cada pata. Esto mira:
+     · ci.yml: el job `dinero` llama al script con
+       `--indice ${{ strategy.job-index }}/${{ strategy.job-total }}` y sin
+       nada de `matrix.` en esa línea;
+     · el script: `--indice k/n` marca el fragmento k+1, y para n de 1 a 12
+       los n fragmentos cubren cada batería de BATERIAS exactamente una vez;
+     · los argumentos malos salen con 2: un filtro que no existe (también con
+       --listar, que antes lo ignoraba y salía con 0), un --indice fuera de
+       rango, dos fragmentos, un --listar que no cuadra con --indice.
+   Todas las llamadas llevan --listar o fallan al leer argumentos: el gate
+   nunca arma una base ni levanta wrangler. Cada una tarda ~0,1 s; las 28,
+   unos 2,5 s. Una que no termina en 60 s se repite una vez antes de contar
+   como fallo: el 25 nov 2026, con la máquina saturada por otras sesiones,
+   dos llamadas sueltas se quedaron colgadas más de 20 s (status null) y
+   el check dio un rojo que no era del script. */
+try {
+  const fallos = [];
+  const SCRIPT = "ops/probar-dinero.mjs";
+  const correrUna = (args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", timeout: 60000 });
+  const correr = (...args) => { const r = correrUna(args); return r.status === null ? correrUna(args) : r; };
+  const BUENA = "probar-dinero.mjs --indice ${{ strategy.job-index }}/${{ strategy.job-total }}";
+
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  const ini = ci.search(/^  dinero:[ \t]*$/m);
+  if (ini === -1) fallos.push("no encontré el job `dinero` en ci.yml");
+  else {
+    const resto = ci.slice(ini + 1);
+    const fin = resto.search(/^  [A-Za-z0-9_-]+:[ \t]*$/m);
+    const llamadas = (fin === -1 ? resto : resto.slice(0, fin)).split("\n")
+      .filter((l) => !/^\s*#/.test(l) && l.includes("probar-dinero.mjs"));
+    if (!llamadas.length) fallos.push("el job `dinero` de ci.yml ya no llama a " + SCRIPT);
+    for (const l of llamadas) {
+      if (!l.includes(BUENA) || /matrix\./.test(l)) {
+        fallos.push("ci.yml corre «" + l.trim() + "»: el fragmento de cada pata tiene que salir de " +
+          "`--indice ${{ strategy.job-index }}/${{ strategy.job-total }}`, no de la matriz");
+      }
+    }
+  }
+
+  const fuente = readFileSync(SCRIPT, "utf8").split("const BATERIAS = [")[1] || "";
+  const nombres = [...fuente.split("\n];")[0].matchAll(/nombre:\s*"([^"]+)"/g)].map((m) => m[1]);
+  if (!nombres.length) fallos.push("no encontré los nombres de BATERIAS en " + SCRIPT);
+  // Las filas del reparto: «  i/n  ~S s · a 22, b 45*» (o «→ i/n …» la de la pata).
+  const filas = (r) => r.stdout.split("\n").map((l) => /^(→| ) (\d+)\/(\d+)  ~\d+ s · (.*)$/.exec(l)).filter(Boolean)
+    .map((m) => ({ marca: m[1] === "→", i: +m[2], n: +m[3],
+                   nombres: m[4] === "ninguna" ? [] : m[4].split(", ").map((x) => x.replace(/ \d+\*?$/, "")) }));
+
+  for (let n = 1; n <= 12 && nombres.length; n++) {
+    const r = correr("--listar", String(n));
+    const f = r.status === 0 ? filas(r) : [];
+    if (r.status !== 0) { fallos.push("--listar " + n + " salió con " + r.status); continue; }
+    if (f.length !== n || f.some((x, k) => x.i !== k + 1 || x.n !== n)) { fallos.push("--listar " + n + " no imprimió las filas 1/" + n + " … " + n + "/" + n); continue; }
+    const vistos = f.flatMap((x) => x.nombres);
+    const faltan = nombres.filter((x) => !vistos.includes(x));
+    const repetidas = vistos.filter((x, k) => vistos.indexOf(x) !== k);
+    const ajenas = vistos.filter((x) => !nombres.includes(x));
+    if (faltan.length || repetidas.length || ajenas.length) {
+      fallos.push("en " + n + " fragmentos: " + [faltan.length && "sin correr " + faltan.join(", "),
+        repetidas.length && "dos veces " + repetidas.join(", "), ajenas.length && "desconocidas " + ajenas.join(", ")].filter(Boolean).join("; "));
+    }
+  }
+  for (const n of [3, 6]) {
+    for (let k = 0; k < n; k++) {
+      const r = correr("--listar", "--indice", k + "/" + n);
+      const marcadas = r.status === 0 ? filas(r).filter((x) => x.marca).map((x) => x.i) : [];
+      if (r.status !== 0 || marcadas.length !== 1 || marcadas[0] !== k + 1) {
+        fallos.push("--indice " + k + "/" + n + " tendría que elegir el fragmento " + (k + 1) + "/" + n +
+          " y " + (r.status !== 0 ? "salió con " + r.status : "marcó [" + marcadas.join(", ") + "]"));
+      }
+    }
+  }
+  for (const args of [["--listar", "nadaexiste"], ["nadaexiste", "--indice", "0/3"], ["--listar", "--indice", "3/3"],
+                      ["--listar", "--indice", "0/0"], ["--listar", "--indice", "1/3", "--fragmento", "2/3"],
+                      ["--listar", "6", "--indice", "0/3"]]) {
+    const r = correr(...args);
+    if (r.status !== 2) fallos.push("«" + args.join(" ") + "» tendría que salir con 2 y salió con " + r.status);
+  }
+  if (nombres.length) {
+    const r = correr("--listar", nombres[0]);
+    if (r.status !== 0 || !r.stdout.includes("filtro «" + nombres[0] + "»: " + nombres[0] + " en ")) {
+      fallos.push("«--listar " + nombres[0] + "» no dice en qué fragmento cae " + nombres[0]);
+    }
+  }
+  if (fallos.length) err("check #29 · reparto del job dinero: " + fallos.join(" · "));
+  else ok("job dinero: ci.yml toma el fragmento de strategy.job-index; " + nombres.length +
+          " baterías, cada una en un solo fragmento para n de 1 a 12; --indice y los argumentos malos, bien");
+} catch (e) { err("check #29 · no se pudo revisar el reparto del job dinero: " + e.message); }
 
 process.exit(fail);
