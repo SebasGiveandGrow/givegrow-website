@@ -22750,8 +22750,9 @@ const IND_TOPE = 20;
 /* El tope del TOTAL histórico (activos + retirados) de cada fundación.
    IND_TOPE solo cuenta los activos, y retirar no borra nada (las mediciones se
    quedan): sin este segundo tope, crear y retirar en bucle llenaría la tabla
-   sin límite. Sesenta es tres veces la batería entera: alcanza para rehacerla
-   un par de veces. Si una fundación de verdad necesita más, escribe al equipo. */
+   sin límite. Sesenta es tres veces el tope de activos: alcanza para rehacer
+   el juego entero de indicadores un par de veces. Si una fundación de verdad
+   necesita más, escribe al equipo. */
 const IND_TOPE_HISTORICO = 60;
 /* La versión de una medición es su `actualizado`, y el panel la manda como
    `ver` al aprobar o devolver (adminMedicionFundacion). Cuando la fundación
@@ -24088,6 +24089,10 @@ function paginaPortal(nonce) {
   input[type=text],input[type=email],input[type=date],textarea,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;
     border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--ink)}
   input:focus,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:var(--acc)}
+  /* Un campo fijo (el nombre de un indicador con mediciones revisadas) no se
+     ve igual que uno editable: sin fondo, borde punteado y texto atenuado. */
+  input:disabled,textarea:disabled,select:disabled{background:transparent;border-style:dashed;color:var(--ink-soft);
+    -webkit-text-fill-color:var(--ink-soft);opacity:1;cursor:not-allowed}
   textarea{resize:vertical;min-height:96px}
   .op{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:15px;margin-top:8px}
   .op input{margin-top:4px;width:17px;height:17px;flex:0 0 auto;accent-color:var(--acc)}
