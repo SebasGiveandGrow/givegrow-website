@@ -2659,7 +2659,15 @@ html.rg-incrustado #page-regalos{padding-bottom:24px}
 .rg-reglas > p{font-size:var(--fs-13);margin:0}
 @media (max-width:820px){
   .rg-zonas,.rg-pasos,.rg-pagar,.rg-reglas dl{grid-template-columns:1fr}
-  .rg-zonas{gap:30px}
+  /* LOS ÁRBOLES EN EL CELULAR (27 nov 2026, pedido de Sebas: «estorban mucho»).
+     Apiladas a todo el ancho, las tres zonas ocupaban varias pantallas. Ahora
+     cada zona es una fila: el árbol, pequeño, a la izquierda, y sus números a
+     la derecha. El árbol conserva su tamaño relativo (Medellín, con la mitad de
+     meta, sigue siendo el más bajo). */
+  .rg-zonas{gap:22px}
+  .rg-zona{display:grid;grid-template-columns:34% minmax(0,1fr);column-gap:18px;align-items:center}
+  .rg-zona .rg-luces{grid-row:1 / span 6;margin:0;max-width:100%}
+  .rg-zona-n{font-size:var(--fs-h2);margin-bottom:4px}
   .rg-pagar{gap:24px}
   .rg-fetq{min-width:0;width:100%}
 }
