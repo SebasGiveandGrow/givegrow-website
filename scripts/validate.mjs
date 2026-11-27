@@ -462,6 +462,20 @@ try {
   else ok("i18n/sv.json: las " + Object.keys(svD).length + " claves de regalos, con sus marcadores");
 } catch (e) { err("i18n/sv.json inválido o ausente: " + e.message); }
 
+/* 2c · Francés (27 nov 2026): la misma regla que el sueco. */
+try {
+  const frD = JSON.parse(readFileSync("i18n/fr.json", "utf8"));
+  const enD = JSON.parse(readFileSync("i18n/en.json", "utf8"));
+  const marcas = (s) => [...String(s).matchAll(/\{\w+\}/g)].map(x => x[0]).sort().join(",");
+  const faltan = Object.keys(enD).filter(k => k.startsWith("rg.") && !(k in frD));
+  const ajenas = Object.keys(frD).filter(k => !k.startsWith("rg.") || !(k in enD));
+  const malas = Object.keys(frD).filter(k => k in enD && marcas(frD[k]) !== marcas(enD[k]));
+  if (faltan.length || ajenas.length || malas.length)
+    err("i18n/fr.json — faltan: [" + faltan.join(", ") + "] sobran: [" + ajenas.join(", ") +
+        "] marcadores distintos del inglés: [" + malas.join(", ") + "]");
+  else ok("i18n/fr.json: las " + Object.keys(frD).length + " claves de regalos, con sus marcadores");
+} catch (e) { err("i18n/fr.json inválido o ausente: " + e.message); }
+
 /* 3 · Cobertura data-i18n */
 const used = [...html.matchAll(/data-i18n="([^"]+)"/g)].map(x => x[1]);
 const missing = [...new Set(used)].filter(k => !es.has(k));

@@ -1525,6 +1525,7 @@
           <button type="button" data-idioma="es" data-act="setLang('es')" lang="es" aria-pressed="true" class="on">Español</button>
           <button type="button" data-idioma="en" data-act="setLang('en')" lang="en" aria-pressed="false">English</button>
           <button type="button" data-idioma="sv" data-act="setLang('sv')" lang="sv" aria-pressed="false">Svenska</button>
+          <button type="button" data-idioma="fr" data-act="setLang('fr')" lang="fr" aria-pressed="false">Français</button>
         </div>
         <!-- LOS ALIADOS (19 nov 2026, pedido de Sebas): solo los logos, sin explicar
              qué hace cada uno, a la altura del idioma. Reemplazan la línea «En
@@ -1600,6 +1601,12 @@
       <p class="rg-cuenta mu" id="rg-cuenta" aria-live="polite"></p>
       <div class="rg-grid" id="rg-grid"></div>
       <div class="rg-mas"><button type="button" class="btn btn-w" id="rg-mas" hidden data-act="rgMas()" data-i18n="rg.mas">Ver más</button></div>
+      <!-- LA BOLSA COMÚN (27 nov 2026): para quien tiene menos del valor de un regalo. -->
+      <div class="rg-bolsa-cta" id="rg-bolsa-cta" hidden>
+        <p class="rg-bolsa-t" data-i18n="rg.bolsa.t">¿No te alcanza para un regalo completo?</p>
+        <p class="mu" data-i18n="rg.bolsa.p">Aporta lo que puedas a la bolsa común. Cuando la bolsa alcanza el valor de un regalo, lo asignamos a un niño que sigue esperando y te contamos a quién llegó tu aporte.</p>
+        <button type="button" class="btn btn-o" data-act="rgBolsa(true)" data-i18n="rg.bolsa.btn">Aportar a la bolsa común</button>
+      </div>
       <p class="rg-priv mu" data-i18n="rg.privnota">Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.</p>
     </div>
   </section>
@@ -1609,8 +1616,17 @@
       <h2 class="h-sec" data-i18n="rg.pagar.h">Tu lista de regalos</h2>
       <div class="rg-pagar">
         <div>
-          <ul class="rg-lista" id="rg-lista"></ul>
-          <p class="rg-total"><span data-i18n="rg.total">Total</span> <strong id="rg-total">—</strong></p>
+          <div id="rg-lista-caja">
+            <ul class="rg-lista" id="rg-lista"></ul>
+            <p class="rg-total"><span data-i18n="rg.total">Total</span> <strong id="rg-total">—</strong></p>
+          </div>
+          <div class="rg-bolsa-caja" id="rg-bolsa-caja" hidden>
+            <p class="mu" data-i18n="rg.bolsa.ayuda">No aparta a ningún niño: se suma a la bolsa hasta completar un regalo, y te escribimos a quién llegó.</p>
+            <div class="field"><label for="rg-monto" data-i18n="rg.bolsa.monto">¿Cuánto quieres aportar?</label>
+              <div class="rg-monto"><span id="rg-bolsa-mon">$</span><input id="rg-monto" type="number" inputmode="numeric" min="1" step="1"></div></div>
+            <p class="mu rg-bolsa-min" id="rg-bolsa-min"></p>
+            <button type="button" class="rg-quitar" data-act="rgBolsa(false)" data-i18n="rg.bolsa.volver">Mejor escojo a un niño</button>
+          </div>
         </div>
         <form id="rg-form" class="ally-form rg-form" data-submit="rgPagar(event)" novalidate>
           <fieldset class="rg-via">

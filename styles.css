@@ -2593,6 +2593,16 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
    junto a lo que se teclea en el banco (concepto, cuenta, SWIFT). */
 .rg-banco{margin:6px 0 10px;max-width:640px}
 .rg-banco dd{display:flex;flex-wrap:wrap;align-items:center;gap:10px;overflow-wrap:anywhere}
+/* LA BOLSA COMÚN (27 nov 2026): una invitación quieta bajo el catálogo y la
+   caja del monto en lugar de la lista. Mismos filos plata que las tarjetas. */
+.rg-bolsa-cta{margin:34px 0 8px;padding:24px 26px;border:1px solid var(--plata);border-radius:16px;background:var(--surface);max-width:720px}
+.rg-bolsa-t{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:var(--fs-h3);color:var(--oro-texto);margin:0 0 8px}
+.rg-bolsa-cta .btn{margin-top:14px}
+.rg-bolsa-caja .field{margin-top:16px}
+.rg-monto{display:flex;align-items:center;gap:10px}
+.rg-monto span{font-weight:700;color:var(--ink)}
+.rg-monto input{max-width:220px}
+.rg-bolsa-min{margin:6px 0 14px}
 .rg-comp{margin:18px 0 22px;max-width:640px;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
 .rg-comp label{font-weight:600}
 .rg-comp .rg-ayuda{margin:0}
