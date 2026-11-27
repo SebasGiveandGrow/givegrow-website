@@ -2665,6 +2665,21 @@ var I18N = {
     "rg.via.l":"¿Cómo quieres pagar?",
     "rg.via.cop":"En pesos colombianos, con Wompi",
     "rg.via.usd":"En dólares, a través de nuestra fundación aliada en Estados Unidos",
+    "rg.bolsa.t":"¿No te alcanza para un regalo completo?",
+    "rg.bolsa.p":"Aporta lo que puedas a la bolsa común. Cuando la bolsa alcanza el valor de un regalo, lo asignamos a un niño que sigue esperando y te contamos a quién llegó tu aporte.",
+    "rg.bolsa.btn":"Aportar a la bolsa común",
+    "rg.bolsa.h":"Tu aporte a la bolsa común",
+    "rg.bolsa.ayuda":"No aparta a ningún niño: se suma a la bolsa hasta completar un regalo, y te escribimos a quién llegó.",
+    "rg.bolsa.monto":"¿Cuánto quieres aportar?",
+    "rg.bolsa.min":"Desde {min}.",
+    "rg.bolsa.volver":"Mejor escojo a un niño",
+    "rg.e.bolsa":"Escribe un monto igual o mayor al mínimo.",
+    "rg.bolsa.banco.t":"Gracias por tu aporte a la bolsa común.",
+    "rg.bolsa.banco.p":"Transfiere {cop} a esta cuenta y escribe {ref} en el concepto. Te enviamos estos mismos datos a tu correo. Tu aporte entra a la bolsa cuando confirmamos la transferencia contra el extracto del banco.",
+    "rg.bolsa.seg":"Tu aporte a la bolsa común ya llegó a estos niños:",
+    "rg.bolsa.espera":"Tu aporte está en la bolsa común. Cuando complete un regalo, aquí verás a qué niño llegó y te escribiremos.",
+    "rg.bolsa.pp.ok":"PayPal confirmó tu pago. Tu aporte ya está en la bolsa común.",
+    "rg.bolsa.uso":"{m} de tu aporte fueron para este regalo.",
     "rg.via.banco":"Directamente al banco de Give&Grow, desde Colombia o desde el exterior",
     "rg.via.paypal":"Moneda internacional, con PayPal (se cobra en dólares)",
     "rg.via.n.banco":"Te mostramos los datos de la cuenta y tu número de pedido, que va en el concepto. Apartamos tus regalos 72 horas y confirmamos cada transferencia contra el extracto del banco antes de darlos por financiados.",
@@ -2889,7 +2904,9 @@ var I18N = {
 var lang = "es";
 /* El sueco solo existe para la página de regalos (3 nov 2026): lo que no está
    en sv.json —el menú, el pie— sale en inglés, no en español. */
-function t(k){ return (I18N[lang] && I18N[lang][k]) || (lang === "sv" && I18N.en && I18N.en[k]) || (I18N.es[k]) || k; }
+/* FRANCÉS (27 nov 2026): igual que el sueco, solo para regalos, y cobra en euros. */
+function soloRegalos(l){ return l === "sv" || l === "fr"; }
+function t(k){ return (I18N[lang] && I18N[lang][k]) || (soloRegalos(lang) && I18N.en && I18N.en[k]) || (I18N.es[k]) || k; }
 
 var currentRoute = "inicio";
 var ROUTE_META = {
@@ -2993,7 +3010,7 @@ function applyRouteMeta(id){
     return; /* renderEmpresa la aplica cuando cargan los datos */
   }
   var m = ROUTE_META[id] || ROUTE_META.inicio;
-  var ti = m.t[lang]||(lang==="sv"&&m.t.en)||m.t.es, de = m.d[lang]||(lang==="sv"&&m.d.en)||m.d.es;
+  var ti = m.t[lang]||(soloRegalos(lang)&&m.t.en)||m.t.es, de = m.d[lang]||(soloRegalos(lang)&&m.d.en)||m.d.es;
   document.title = ti;
   setMetaTag("name","description",de);
   // la vista 404 del SPA se sirve con 200 (fallback SPA): no indexarla
@@ -3011,7 +3028,7 @@ function applyRouteMeta(id){
      previa no ve la #, va a la raíz y pinta la tarjeta de la portada. */
   var conPath = RUTAS_PATH.indexOf(id) > -1 || id === "socialfest";
   setMetaTag("property","og:url",ORIGIN_FUND+(conPath ? "/" : "/#")+id);
-  setMetaTag("property","og:locale", lang==="en"?"en_US":lang==="sv"?"sv_SE":"es_CO");
+  setMetaTag("property","og:locale", lang==="en"?"en_US":lang==="sv"?"sv_SE":lang==="fr"?"fr_FR":"es_CO");
   /* La imagen de la tarjeta, la misma que pone el Worker (`OG_IMG_RUTA` y
      `cabeceraPagina`): si no, al navegar se volvía a la de la portada. */
   var ogImg = ORIGIN_FUND + "/img/og" + (id==="regalos" ? "-regalos" : "") + (lang!=="es" ? "-en" : "") + ".jpg";
@@ -3367,7 +3384,7 @@ function cargarIdioma(l){
    así que pide los dos. */
 function ensureLang(next){
   if (next === "en") return cargarIdioma("en");
-  if (next === "sv") return Promise.all([cargarIdioma("en"), cargarIdioma("sv")]);
+  if (soloRegalos(next)) return Promise.all([cargarIdioma("en"), cargarIdioma(next)]);
   return Promise.resolve();
 }
 /* SUECO, SOLO EN REGALOS. Fuera de esa página el resto del sitio sigue siendo
@@ -3375,10 +3392,10 @@ function ensureLang(next){
    quien lee en sueco y sale de regalos pasa al inglés. Se mira también la
    dirección porque al arrancar el idioma se aplica antes de enrutar. */
 function idiomaPosible(l){
-  if (l !== "sv") return (l === "en") ? "en" : "es";
+  if (!soloRegalos(l)) return (l === "en") ? "en" : "es";
   var enRegalos = currentRoute === "regalos" || /^#regalos(\b|$)/.test(location.hash) ||
                   /^\/regalos\/?$/.test(location.pathname);
-  return enRegalos ? "sv" : "en";
+  return enRegalos ? l : "en";
 }
 /* La franja vive fuera de las páginas porque se puede pulsar EN desde
    cualquiera. Va en las dos lenguas en la misma línea a propósito: el
@@ -3449,7 +3466,7 @@ function setLang(l){
   });
 }
 function applyLang(l){
-  lang = (l === "en" || l === "sv") ? l : "es";
+  lang = (l === "en" || soloRegalos(l)) ? l : "es";
   document.documentElement.lang = lang;
   var nodes = document.querySelectorAll("[data-i18n]");
   for (var i=0;i<nodes.length;i++){
@@ -3884,7 +3901,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "3b5d2f68", impacto: "59c96b4d", regalos: "735e59c7", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "3b5d2f68", impacto: "59c96b4d", regalos: "2c59afec", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -4028,7 +4045,7 @@ var ACT_DIFERIDAS = {
   closeLightbox:"impacto", lbStep:"impacto",
   rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
   rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
-  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos", rgCopiar:"regalos", rgComprobante:"regalos",
+  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos", rgBolsa:"regalos", rgCopiar:"regalos", rgComprobante:"regalos",
   apuCalcula:"apadrinamiento", apuInteres:"apadrinamiento"
 };
 function runAct(spec, el, ev){
@@ -4139,7 +4156,7 @@ function go(id, fromPop){
      antes de tiempo (ver index.html). Desde aquí manda `.active`. */
   document.documentElement.removeAttribute("data-ruta");
   currentRoute = id;
-  if (lang === "sv" && id !== "regalos") setLang("en");
+  if (soloRegalos(lang) && id !== "regalos") setLang("en");
   /* LA DIRECCIÓN SE QUEDA COMO ES (16 nov 2026). Antes /donar se reescribía a
      /#donar al cargar; como ahora cada dirección trae solo su página, copiar
      ese enlace abría la portada y obligaba a una segunda carga. En su propia
@@ -6263,7 +6280,7 @@ function init(){
      deja el español. */
   /* `?lang=sv` solo vale en regalos; en otra página `setLang` lo vuelve inglés. */
   var qLang = new URLSearchParams(location.search).get("lang");
-  setLang(qLang === "en" || qLang === "sv" ? qLang : "es");
+  setLang(qLang === "en" || qLang === "sv" || qLang === "fr" ? qLang : "es");
   /* /transparencia, /donar, /teoria-de-cambio… son la misma SPA servida con
      path propio para los buscadores (ver `RUTAS_PATH`). Desde el 16 nov 2026
      la dirección se queda como llegó: ver `rutaDeLaURL` y `go`. */

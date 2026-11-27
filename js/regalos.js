@@ -8,11 +8,22 @@
    página, no a cerrar la pestaña, y no sale del navegador hasta que se paga.
    Que un regalo siga libre lo decide el servidor al apartarlo, no esta lista. */
 var RG = {
-  datos: null, pidiendo: null, ver: 24, via: "cop", enviando: false,
+  datos: null, pidiendo: null, paginas: 1, via: "cop", enviando: false,
   f: { zona: "", tipo: "", edad: "", genero: "", disp: "1" },
   lista: []
 };
-var RG_PAGINA = 24;
+/* TRES FILAS Y «VER MÁS» (27 nov 2026, pedido de Sebas). Antes se mostraban 24
+   tarjetas de una vez; ahora caben exactamente tres filas, sean cuantas sean
+   las columnas en esa pantalla, y cada «Ver más» suma tres filas. Las columnas
+   se leen de la grilla ya pintada (auto-fill), no se adivinan. */
+var RG_FILAS = 3;
+function rgColumnas(){
+  var g = rgEl("rg-grid");
+  var v = g ? getComputedStyle(g).gridTemplateColumns : "none";
+  var n = v && v !== "none" ? v.split(" ").filter(Boolean).length : 0;
+  return n > 0 ? n : 4;
+}
+function rgVer(){ return rgColumnas() * RG_FILAS * RG.paginas; }
 /* El moño del regalo envuelto (las tarjetas sin foto). */
 var RG_MONO = '<span class="rg-mono" aria-hidden="true"><svg viewBox="0 0 48 30">' +
   '<path class="rg-cola" d="M20 15l-7 12M28 15l7 12"/>' +
@@ -59,8 +70,13 @@ function rgEsc(s){ return escapeHtml(s == null ? "" : String(s)); }
 function rgCOP(n){ return "$" + Number(n || 0).toLocaleString("es-CO"); }
 function rgUSD(n){ return "US$" + Number(n || 0).toLocaleString("en-US"); }
 /* La moneda que ve el donante: dólares con la aliada o con PayPal (0070). */
-function rgEnUsd(){ return RG.via === "usd" || RG.via === "paypal"; }
-function rgValor(r){ return rgEnUsd() ? rgUSD(r.valor_usd) : rgCOP(r.valor_cop); }
+/* EUROS (27 nov 2026): la página en francés cobra en euros con PayPal. La
+   aliada sigue en dólares; el banco y Wompi, en pesos. */
+function rgEUR(n){ return Number(n || 0).toLocaleString("fr-FR") + " €"; }
+function rgMoneda(){ return RG.via === "usd" ? "USD" : RG.via === "paypal" ? (lang === "fr" ? "EUR" : "USD") : "COP"; }
+function rgFmt(m, n){ return m === "EUR" ? rgEUR(n) : m === "USD" ? rgUSD(n) : rgCOP(n); }
+function rgValorDe(r, m){ return m === "EUR" ? r.valor_eur : m === "USD" ? r.valor_usd : r.valor_cop; }
+function rgValor(r){ var m = rgMoneda(); return rgFmt(m, rgValorDe(r, m)); }
 function rgEdad(n){ return t(n === 1 ? "rg.anio" : "rg.anios").replace("{n}", n); }
 function rgZona(id){
   var z = (RG.datos && RG.datos.zonas || []).filter(function(x){ return x.id === id; })[0];
@@ -83,8 +99,14 @@ function rgEl(id){ return document.getElementById(id); }
 var RG_TIPO_SV = { juguete: "Leksak", ropa: "Kläder", calzado: "Skor", escolar: "Skolmaterial",
   deporte: "Sport", libro: "Böcker", otro: "Annat" };
 function rgIngles(){ return lang !== "es"; }
-function rgLoc(){ return lang === "sv" ? "sv-SE" : lang === "en" ? "en-US" : "es-CO"; }
-function rgNombreTipo(k){ return lang === "sv" && RG_TIPO_SV[k.id] ? RG_TIPO_SV[k.id] : rgIngles() ? k.nombre_en : k.nombre_es; }
+var RG_TIPO_FR = { juguete: "Jouet", ropa: "Vêtements", calzado: "Chaussures", escolar: "Fournitures scolaires",
+  deporte: "Sport", libro: "Livres", otro: "Autre" };
+function rgLoc(){ return lang === "sv" ? "sv-SE" : lang === "fr" ? "fr-FR" : lang === "en" ? "en-US" : "es-CO"; }
+function rgNombreTipo(k){
+  if (lang === "sv" && RG_TIPO_SV[k.id]) return RG_TIPO_SV[k.id];
+  if (lang === "fr" && RG_TIPO_FR[k.id]) return RG_TIPO_FR[k.id];
+  return rgIngles() ? k.nombre_en : k.nombre_es;
+}
 
 /* Al entrar a la ruta: los datos de nuevo (cambian mientras la gente paga) y,
    si el enlace trae ?rg= y ?rt=, el seguimiento de ese pedido. */
@@ -139,7 +161,8 @@ function rgPinta(){
   rgEl("rg-espera").hidden = !(abierta && c.recibe);
   if (!abierta) { rgEl("rg-pagar").hidden = true; rgEl("rg-barra").hidden = true; return; }
   /* En inglés (y en sueco), si hay aliada, el dólar va primero. */
-  if (!RG.viaElegida) RG.via = rgIngles() && c.usd ? "usd" : "cop";
+  /* En francés, PayPal en euros va primero; en inglés y sueco, la aliada. */
+  if (!RG.viaElegida) RG.via = lang === "fr" && c.paypal ? "paypal" : rgIngles() && c.usd ? "usd" : "cop";
   rgPintaFiltros();
   rgPintaGrid();
   rgPintaLista();
@@ -299,12 +322,20 @@ function rgChip(campo, valor, texto){
 function rgPintaFiltros(){
   var d = RG.datos;
   var g = function(etq, chips){ return '<div class="rg-fgrupo" role="group" aria-label="' + rgEsc(etq) + '"><span class="rg-fetq">' + rgEsc(etq) + '</span>' + chips + '</div>'; };
-  var zonas = rgChip("zona", "", t("rg.todas")) + (d.zonas || []).map(function(z){ return rgChip("zona", z.id, rgIngles() ? z.nombre_en : z.nombre_es); }).join("");
+  /* SOLO LAS ZONAS QUE YA TIENEN NIÑOS (27 nov 2026, pedido de Sebas): un filtro
+     de Medellín o Uribia sin una sola tarjeta llevaba a una lista vacía. Cuando
+     se carguen sus niños, el filtro aparece solo. Con una sola zona, el grupo
+     entero sobra. */
+  var conNinos = (d.zonas || []).filter(function(z){ return (d.regalos || []).some(function(r){ return r.zona === z.id; }); });
+  if (RG.f.zona && !conNinos.some(function(z){ return z.id === RG.f.zona; })) RG.f.zona = "";
+  var zonas = conNinos.length > 1
+    ? rgChip("zona", "", t("rg.todas")) + conNinos.map(function(z){ return rgChip("zona", z.id, rgIngles() ? z.nombre_en : z.nombre_es); }).join("")
+    : "";
   var tipos = rgChip("tipo", "", t("rg.todos")) + (d.categorias || []).map(function(k){ return rgChip("tipo", k.id, rgNombreTipo(k)); }).join("");
-  var edades = rgChip("edad", "", t("rg.todas")) + Object.keys(RG_EDADES).map(function(k){ return rgChip("edad", k, t("rg.edad.r").replace("{r}", k.replace("-", lang === "sv" ? " till " : lang === "en" ? " to " : " a "))); }).join("");
+  var edades = rgChip("edad", "", t("rg.todas")) + Object.keys(RG_EDADES).map(function(k){ return rgChip("edad", k, t("rg.edad.r").replace("{r}", k.replace("-", lang === "sv" ? " till " : lang === "fr" ? " à " : lang === "en" ? " to " : " a "))); }).join("");
   var generos = rgChip("genero", "", t("rg.todos")) + rgChip("genero", "nina", t("rg.genero.nina")) + rgChip("genero", "nino", t("rg.genero.nino"));
   var disp = rgChip("disp", "1", t("rg.f.disp")) + rgChip("disp", "", t("rg.f.todos"));
-  rgEl("rg-filtros").innerHTML = g(t("rg.f.zona"), zonas) + g(t("rg.f.tipo"), tipos) + g(t("rg.f.edad"), edades) +
+  rgEl("rg-filtros").innerHTML = (zonas ? g(t("rg.f.zona"), zonas) : "") + g(t("rg.f.tipo"), tipos) + g(t("rg.f.edad"), edades) +
     g(t("rg.f.genero"), generos) + g(t("rg.f.estado"), disp);
 }
 
@@ -346,9 +377,19 @@ function rgPintaGrid(){
   if (total && !lista.length) {
     grid.innerHTML = '<p class="rg-vacio mu">' + rgEsc(t("rg.ninguno")) + '</p>';
   } else {
-    grid.innerHTML = lista.slice(0, RG.ver).map(function(r){ return rgTarjeta(r, recibe); }).join("");
+    grid.innerHTML = lista.slice(0, rgVer()).map(function(r){ return rgTarjeta(r, recibe); }).join("");
   }
-  rgEl("rg-mas").hidden = lista.length <= RG.ver;
+  rgEl("rg-mas").hidden = lista.length <= rgVer();
+  /* Si al girar el celular o cambiar el ancho cambian las columnas, se vuelve a
+     cortar en filas completas. */
+  if (!RG.oyeAncho) {
+    RG.oyeAncho = true;
+    var cols = rgColumnas(), t0 = 0;
+    window.addEventListener("resize", function(){
+      clearTimeout(t0);
+      t0 = setTimeout(function(){ var c = rgColumnas(); if (c !== cols && currentRoute === "regalos") { cols = c; rgPintaGrid(); } }, 200);
+    });
+  }
 }
 
 function rgTarjeta(r, recibe){
@@ -446,11 +487,11 @@ function rgEspera(){
 function rgFiltro(campo, valor){
   if (!RG.f.hasOwnProperty(campo)) return;
   RG.f[campo] = valor == null ? "" : String(valor);
-  RG.ver = RG_PAGINA;
+  RG.paginas = 1;
   rgPintaFiltros();
   rgPintaGrid();
 }
-function rgMas(){ RG.ver += RG_PAGINA; rgPintaGrid(); }
+function rgMas(){ RG.paginas += 1; rgPintaGrid(); }
 
 function rgToggle(codigo){
   var i = RG.lista.indexOf(codigo);
@@ -472,16 +513,24 @@ function rgElegidos(){
 }
 function rgTotal(sel){
   var s = 0;
-  sel.forEach(function(r){ s += Number(rgEnUsd() ? r.valor_usd : r.valor_cop) || 0; });
-  return rgEnUsd() ? rgUSD(s) : rgCOP(s);
+  var m = rgMoneda();
+  sel.forEach(function(r){ s += Number(rgValorDe(r, m)) || 0; });
+  return rgFmt(m, s);
 }
 
 function rgPintaLista(){
   var sel = rgElegidos(), c = RG.datos.campana || {};
   var recibe = !!c.recibe;
-  rgEl("rg-pagar").hidden = !recibe || !sel.length;
+  /* LA BOLSA COMÚN (0072): el mismo formulario, sin lista y con un monto. */
+  var enBolsa = !!RG.bolsa && recibe;
+  rgEl("rg-pagar").hidden = !recibe || (!sel.length && !enBolsa);
   var barra = rgEl("rg-barra");
-  barra.hidden = !recibe || !sel.length;
+  barra.hidden = !recibe || !sel.length || enBolsa;
+  var cta = rgEl("rg-bolsa-cta"); if (cta) cta.hidden = !recibe;
+  rgEl("rg-bolsa-caja").hidden = !enBolsa;
+  rgEl("rg-lista-caja").hidden = enBolsa;
+  var carta = document.querySelector("#rg-form .rg-carta"); if (carta) carta.hidden = enBolsa;
+  var tit = document.querySelector("#rg-pagar .h-sec"); if (tit) tit.textContent = t(enBolsa ? "rg.bolsa.h" : "rg.pagar.h");
   rgEl("rg-barra-t").textContent = t(sel.length === 1 ? "rg.barra.1" : "rg.barra.n").replace("{n}", sel.length).replace("{total}", rgTotal(sel));
   rgEl("rg-lista").innerHTML = sel.map(function(r){
     return '<li><span><strong>' + rgEsc(r.nombre) + '</strong>, ' + rgEsc(rgEdad(r.edad)) + ' · ' + rgEsc(rgDeseo(r)) +
@@ -492,9 +541,16 @@ function rgPintaLista(){
   }).join("");
   rgEl("rg-total").textContent = rgTotal(sel);
   /* La vía en dólares existe solo si /admin/regalos tiene la aliada configurada. */
-  var hay = { cop: true, usd: !!c.usd, banco: !!c.banco, paypal: !!c.paypal };
+  /* La bolsa no va por la aliada: su confirmación es a mano y por pedido. */
+  var hay = { cop: true, usd: !!c.usd && !enBolsa, banco: !!c.banco, paypal: !!c.paypal };
   ["usd", "banco", "paypal"].forEach(function(v){ var l = rgEl("rg-via-" + v); if (l) l.hidden = !hay[v]; });
-  if (!hay[RG.via]) RG.via = "cop";
+  if (!hay[RG.via]) RG.via = hay.paypal && rgIngles() ? "paypal" : "cop";
+  if (enBolsa) {
+    var mon = rgMoneda(), mins = c.bolsa_min || { COP: 20000, USD: 5, EUR: 5 };
+    rgEl("rg-bolsa-mon").textContent = mon === "EUR" ? "€" : mon === "USD" ? "US$" : "$";
+    rgEl("rg-monto").min = mins[mon];
+    rgEl("rg-bolsa-min").textContent = t("rg.bolsa.min").replace("{min}", rgFmt(mon, mins[mon]));
+  }
   Array.prototype.forEach.call(document.querySelectorAll('input[name="rg-via"]'), function(x){ x.checked = x.value === RG.via; });
   var vn = rgEl("rg-via-nota");
   if (vn) { vn.hidden = RG.via !== "banco" && RG.via !== "paypal"; vn.textContent = vn.hidden ? "" : t("rg.via.n." + RG.via); }
@@ -512,6 +568,13 @@ function rgVia(v){
   rgPintaLista();
 }
 function rgCert(){ rgEl("rg-cert-datos").hidden = !rgEl("rg-cert").checked; }
+function rgBolsa(on){
+  RG.bolsa = !!on;
+  rgPintaLista();
+  var s = rgEl(RG.bolsa ? "rg-pagar" : "rg-catalogo");
+  if (s && !s.hidden) s.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (RG.bolsa) { var m = rgEl("rg-monto"); if (m) m.focus({ preventScroll: true }); }
+}
 function rgIrAPagar(){
   var s = rgEl("rg-pagar");
   if (s && !s.hidden) { s.scrollIntoView({ behavior: "smooth", block: "start" }); var n = rgEl("rg-nombre"); if (n) n.focus({ preventScroll: true }); }
@@ -526,8 +589,13 @@ function rgPagar(ev){
   if (RG.enviando) return false;
   var note = rgEl("rg-msg");
   if (rgEl("rg-web2").value) return false;
-  var sel = rgElegidos();
-  if (!sel.length) { allyMsg(note, t("rg.e.vacio"), false); return false; }
+  var sel = rgElegidos(), c0 = (RG.datos && RG.datos.campana) || {};
+  var monto = 0, mon = rgMoneda();
+  if (RG.bolsa) {
+    var mins = c0.bolsa_min || { COP: 20000, USD: 5, EUR: 5 };
+    monto = parseInt(String(rgEl("rg-monto").value).replace(/[^0-9]/g, ""), 10) || 0;
+    if (monto < mins[mon]) { allyMal(note, "rg-monto", "rg.e.bolsa"); return false; }
+  } else if (!sel.length) { allyMsg(note, t("rg.e.vacio"), false); return false; }
   var nombre = rgEl("rg-nombre").value.trim(), email = rgEl("rg-email").value.trim();
   if (nombre.length < 2) { allyMal(note, "rg-nombre", "rg.e.nombre"); return false; }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { allyMal(note, "rg-email", "rg.e.email"); return false; }
@@ -538,7 +606,9 @@ function rgPagar(ev){
   if (!rgEl("rg-priv").checked) { allyMal(note, "rg-priv", "rg.e.priv"); return false; }
 
   var cuerpo = {
-    items: RG.lista.slice(), via: RG.via, nombre: nombre, email: email,
+    items: RG.bolsa ? [] : RG.lista.slice(), via: RG.via, nombre: nombre, email: email,
+    bolsa: !!RG.bolsa, monto: RG.bolsa ? monto : undefined, moneda: mon === "EUR" ? "EUR" : undefined,
+    pagina: lang, /* para volver de PayPal a la página en el mismo idioma */
     telefono: rgEl("rg-tel").value.trim(), idioma: rgIngles() ? "en" : "es", /* en sueco, los correos salen en inglés */
     certificado: cert, cert_doc_tipo: rgEl("rg-doctipo").value,
     cert_doc_numero: rgEl("rg-docnum").value.trim(), cert_ciudad: rgEl("rg-ciudad").value.trim(), muro: "no",
@@ -551,7 +621,7 @@ function rgPagar(ev){
   fetch("/api/regalos/pedido", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
     .then(function(r){ return r.json().then(function(j){ if (!r.ok) { var e = new Error(j.error || "http_" + r.status); e.datos = j; throw e; } return j; }); })
     .then(function(d){
-      RG.lista = []; rgGuardaLista();
+      if (!RG.bolsa) { RG.lista = []; rgGuardaLista(); }
       var sigue = function(){
         if (d.canal === "banco") { RG.enviando = false; btn.disabled = false; rgPintaBanco(d); return; }
         if (d.canal === "paypal") {
@@ -598,6 +668,7 @@ function rgPagar(ev){
       var clave = { campana_cerrada: "rg.e.cerrada", demasiados_regalos: "rg.e.muchos", monto_invalido: "rg.e.monto",
         demasiados_intentos: "rg.e.intentos", certificado_datos_invalidos: "rg.e.cert", correo_invalido: "rg.e.email",
         usd_no_disponible: "rg.e.usd", pasarela_no_configurada: "rg.e.pasarela",
+        monto_invalido: RG.bolsa ? "rg.e.bolsa" : "rg.e.monto",
         paypal_fallo: "rg.e.paypal", paypal_no_configurado: "rg.e.paypal" }[c] || "rg.e.red";
       allyMsg(note, t(clave), false);
     });
@@ -664,8 +735,8 @@ function rgPintaBanco(d){
   var s = rgEl("rg-usd");
   s.hidden = false;
   rgEl("rg-usd-ok").innerHTML =
-    '<p class="rg-usd-t">' + rgEsc(t("rg.banco.t")) + '</p>' +
-    '<p>' + rgEsc(t("rg.banco.p").replace("{cop}", rgCOP(d.total_cop)).replace("{ref}", d.ref)) + '</p>' +
+    '<p class="rg-usd-t">' + rgEsc(t(d.bolsa ? "rg.bolsa.banco.t" : "rg.banco.t")) + '</p>' +
+    '<p>' + rgEsc(t(d.bolsa ? "rg.bolsa.banco.p" : "rg.banco.p").replace("{cop}", rgCOP(d.total_cop)).replace("{ref}", d.ref)) + '</p>' +
     '<p class="rg-ref">' + rgEsc(d.ref) + '</p>' +
     rgBancoHtml(d.banco, d.ref, rgCOP(d.total_cop), rgUSD(d.total_usd)) +
     rgCompHtml("/api/comprobante/" + encodeURIComponent(d.guia) + "?t=" + encodeURIComponent(d.aporte_token)) +
@@ -677,12 +748,12 @@ function rgPintaBanco(d){
 function rgPaypalVuelta(ref, tk, cancelado){
   var sec = rgEl("rg-seguimiento"), cuerpo = rgEl("rg-seg-cuerpo");
   if (sec) { sec.hidden = false; sec.scrollIntoView({ block: "start" }); }
-  if (cancelado) { RG.ppAviso = t("rg.pp.cancelado"); rgSeguimiento(ref, tk); return; }
+  if (cancelado) { RG.ppAviso = "cancelado"; rgSeguimiento(ref, tk); return; }
   if (cuerpo) cuerpo.textContent = t("rg.pp.capturando");
   fetch("/api/regalos/pedido/" + encodeURIComponent(ref) + "/paypal?t=" + encodeURIComponent(tk), { method: "POST" })
     .then(function(r){ return r.json().catch(function(){ return {}; }); })
-    .then(function(j){ RG.ppAviso = t(j && j.ok ? "rg.pp.ok" : "rg.pp.mal"); rgSeguimiento(ref, tk); })
-    .catch(function(){ RG.ppAviso = t("rg.pp.mal"); rgSeguimiento(ref, tk); });
+    .then(function(j){ RG.ppAviso = j && j.ok ? "ok" : "mal"; rgSeguimiento(ref, tk); })
+    .catch(function(){ RG.ppAviso = "mal"; rgSeguimiento(ref, tk); });
 }
 function rgPintaPagoNuevaPestana(d){
   rgEl("rg-pagar").hidden = true;
@@ -787,8 +858,10 @@ function rgPintaSeg(){
   if (!RG.seg) return;
   var d = RG.seg.d, cuerpo = rgEl("rg-seg-cuerpo");
   var estado = d.estado === "pendiente" && d.pago === "rechazada" ? "fallido" : d.estado;
-  var total = d.via === "usd" ? rgUSD(d.total_usd) : rgCOP(d.total_cop);
-  var aviso = RG.ppAviso ? '<p class="rg-usd-t">' + rgEsc(RG.ppAviso) + '</p>' : '';
+  var monS = d.moneda || (d.via === "usd" ? "USD" : "COP");
+  var total = rgFmt(monS, monS === "EUR" ? d.total_eur : monS === "USD" ? d.total_usd : d.total_cop);
+  /* Al volver de PayPal: un aporte a la bolsa no financia regalos propios. */
+  var aviso = RG.ppAviso ? '<p class="rg-usd-t">' + rgEsc(t(RG.ppAviso === "ok" && d.bolsa ? "rg.bolsa.pp.ok" : "rg.pp." + RG.ppAviso)) + '</p>' : '';
   var cab = aviso + '<dl class="rec-list rg-seg-cab">' +
     '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.pedido")) + '</dt><dd>' + rgEsc(d.ref) + '</dd></div>' +
     '<div class="rec-item"><dt>' + rgEsc(t("rg.seg.estado")) + '</dt><dd>' + rgEsc(t("rg.pe." + estado)) + '</dd></div>' +
@@ -800,8 +873,12 @@ function rgPintaSeg(){
     (d.banco ? rgBancoHtml(d.banco, d.ref, rgCOP(d.total_cop), rgUSD(d.total_usd)) : '') +
     (d.comprobante && !d.comprobante.subido ? rgCompHtml(d.comprobante.url) : '') +
     (d.aliada_url ? '<p><a class="btn btn-g" href="' + rgEsc(d.aliada_url) + '" target="_blank" rel="noopener">' + rgEsc(t("rg.usd.ir").replace("{a}", d.aliada)) + '</a></p>' : '');
-  var items = (d.items || []).map(function(it){
-    var nota = "";
+  /* Un aporte a la bolsa: los niños a los que llegó su dinero, con su recorrido. */
+  var lista = d.bolsa ? (d.bolsa.usos || []) : (d.items || []);
+  var bolsaCab = d.bolsa
+    ? '<p class="rg-seg-nota">' + rgEsc(t(lista.length ? "rg.bolsa.seg" : "rg.bolsa.espera")) + '</p>' : '';
+  var items = lista.map(function(it){
+    var nota = d.bolsa ? '<p class="rg-seg-nota">' + rgEsc(t("rg.bolsa.uso").replace("{m}", rgFmt(monS, it.monto))) + '</p>' : "";
     if (it.resultado === "sustituido") nota = '<p class="rg-seg-nota">' + rgEsc(t("rg.seg.sust")) + '</p>';
     if (it.estado === "sin_cupo") nota = '<p class="rg-seg-nota">' + rgEsc(t("rg.seg.sincupo")) + '</p>';
     var linea = RG_PASOS.map(function(p){
@@ -814,7 +891,7 @@ function rgPintaSeg(){
       '<p class="rg-donde">' + rgEsc((rgIngles() ? it.zona_en : it.zona_es) + " · " + it.departamento) + ' · ' + rgEsc(it.codigo) + '</p>' +
       nota + (it.estado === "sin_cupo" || it.estado === "apartado" ? '' : '<ol class="rg-linea">' + linea + '</ol>') + '</article>';
   }).join("");
-  cuerpo.innerHTML = cab + '<div class="rg-seg-items">' + items + '</div>' + rgSegCarta(d);
+  cuerpo.innerHTML = cab + bolsaCab + '<div class="rg-seg-items">' + items + '</div>' + (d.bolsa ? '' : rgSegCarta(d));
 }
 function rgSegCarta(d){
   var m = d.mensaje, h = '<div class="rg-seg-carta"><h3 class="h-comp4">' + rgEsc(t("rg.carta.seg")) + '</h3>';

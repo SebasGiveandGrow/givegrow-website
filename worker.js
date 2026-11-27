@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "efc99771";
+const STYLES_V = "f5e91bf0";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -3340,6 +3340,15 @@ const RE_PEDIDO_REGALO = /^RG-\d{4}-\d{6}$/;
    prueba: la transferencia entra a la bandeja que se contrasta contra el
    extracto; PayPal se confirma solo con la captura, que trae el número RG. */
 const REGALOS_RESERVA_PAYPAL_MIN = 60;
+/* LA BOLSA COMÚN (0072, 27 nov 2026): para quien tiene menos del valor de un
+   regalo. Mínimos que decidió Sebas: por encima de lo que se pierde en
+   comisiones. Los topes en dólares y euros son los mismos que un pedido. */
+const REGALOS_BOLSA_MIN = { COP: 20000, USD: 5, EUR: 5 };
+const REGALOS_BOLSA_MAX = { USD: 5000, EUR: 5000 };
+/* La moneda de un pedido: la columna `moneda` (0072) y, para los anteriores,
+   lo que decía `via`. */
+function monedaPedido(p){ return p.moneda || (p.via === "usd" ? "USD" : "COP"); }
+function totalPedido(p){ const m = monedaPedido(p); return m === "EUR" ? p.total_eur : m === "USD" ? p.total_usd : p.total_cop; }
 /* La cuenta es la que ya publica /donar y la que cita el certificado
    (`ENTIDAD` en documentos.js). El SWIFT y las direcciones son lo que pide un
    banco extranjero para girar a Colombia. Solo se muestran DESPUÉS de crear el
@@ -3419,6 +3428,8 @@ async function apiRegalos(env) {
   const campana = {
     id: c.id, nombre_es: c.nombre_es, nombre_en: c.nombre_en, estado: c.estado, cierre: c.cierre,
     recibe: regalosRecibe(c), aliada_nombre: c.aliada_nombre || null, usd: !!(c.aliada_nombre && c.aliada_url), paypal: !!paypalConfig(env), banco: true,
+    /* Euros (0072): por PayPal y solo si cada tipo de regalo tiene su valor. La bolsa: sus mínimos. */
+    eur: !!paypalConfig(env), bolsa_min: REGALOS_BOLSA_MIN,
     /* Cuántos días quedan para donar, contados en Colombia: 0 = hoy es el
        último. Lo calcula el servidor para no depender del reloj de quien mira. */
     quedan_dias: regalosRecibe(c) && c.cierre
@@ -3427,12 +3438,12 @@ async function apiRegalos(env) {
   };
   const zonas = await regalosZonas(env);
   const cats = await env.DB.prepare(
-    "SELECT id, nombre_es, nombre_en, valor_cop, valor_usd, con_talla FROM regalo_categorias " +
+    "SELECT id, nombre_es, nombre_en, valor_cop, valor_usd, valor_eur, con_talla FROM regalo_categorias " +
     "WHERE valor_cop IS NOT NULL AND valor_usd IS NOT NULL ORDER BY orden"
   ).all();
   const categorias = (cats.results || []).map((x) => ({
     id: x.id, nombre_es: x.nombre_es, nombre_en: x.nombre_en,
-    valor_cop: x.valor_cop, valor_usd: x.valor_usd, con_talla: !!x.con_talla
+    valor_cop: x.valor_cop, valor_usd: x.valor_usd, valor_eur: x.valor_eur == null ? null : x.valor_eur, con_talla: !!x.con_talla
   }));
   /* Solo con la campaña abierta se muestran los niños. Cerrada, la página
      deja los árboles y el seguimiento de cada donante: la autorización que
@@ -3445,7 +3456,7 @@ async function apiRegalos(env) {
     "CASE WHEN " + REGALO_LIBRE + " THEN 1 ELSE 0 END AS libre, " +
     "n.nombre_publico, n.edad, n.genero, " +
     "CASE WHEN n.autoriza_foto = 1 AND n.foto_key IS NOT NULL THEN 1 ELSE 0 END AS foto, " +
-    "k.valor_cop, k.valor_usd " +
+    "k.valor_cop, k.valor_usd, k.valor_eur " +
     "FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id " +
     "JOIN regalo_categorias k ON k.id = r.categoria_id " +
     "WHERE r.campana_id = ? AND r.estado NOT IN ('borrador', 'retirado') AND " + NINO_PUBLICABLE + " " +
@@ -3455,7 +3466,7 @@ async function apiRegalos(env) {
     codigo: r.codigo, zona: r.zona_id, categoria: r.categoria_id,
     deseo_es: r.deseo_es, deseo_en: r.deseo_en || null, talla: r.talla || null,
     nombre: r.nombre_publico, edad: r.edad, genero: r.genero, foto: !!r.foto,
-    valor_cop: r.valor_cop, valor_usd: r.valor_usd,
+    valor_cop: r.valor_cop, valor_usd: r.valor_usd, valor_eur: r.valor_eur == null ? null : r.valor_eur,
     /* Desde qué día espera (solo la fecha): el botón «regala a quien más lleva
        esperando» elige con ella. */
     desde: r.publicado_en ? String(r.publicado_en).slice(0, 10) : null,
@@ -3528,11 +3539,20 @@ async function apiRegalosPedido(request, env, url) {
   if (via === "usd" && !canal && !(campana.aliada_nombre && campana.aliada_url)) {
     return json({ error: "usd_no_disponible" }, 409);
   }
+  /* Euros (0072): solo por PayPal, desde la página en francés. */
+  const moneda = via === "cop" ? "COP" : (canal === "paypal" && c.moneda === "EUR") ? "EUR" : "USD";
+  if (c.moneda === "EUR" && moneda !== "EUR") return json({ error: "eur_solo_paypal" }, 400);
+  /* Un aporte a la bolsa no aparta a nadie: el dinero espera hasta completar
+     un regalo. Por la aliada no va —su confirmación es a mano y por pedido—:
+     en dólares, la bolsa entra por PayPal. */
+  const bolsa = c.bolsa === true ? 1 : 0;
+  if (bolsa && via === "usd" && !canal) return json({ error: "bolsa_sin_aliada" }, 400);
 
   const codigos = Array.isArray(c.items)
     ? [...new Set(c.items.map((x) => String(x || "").toUpperCase().trim()))].filter((x) => RE_CODIGO_REGALO.test(x))
     : [];
-  if (!codigos.length) return json({ error: "sin_regalos" }, 400);
+  if (bolsa) codigos.length = 0;
+  if (!codigos.length && !bolsa) return json({ error: "sin_regalos" }, 400);
   if (codigos.length > REGALOS_MAX_CARRITO) return json({ error: "demasiados_regalos", max: REGALOS_MAX_CARRITO }, 400);
 
   const nombre = limpiar(c.nombre, 120);
@@ -3577,21 +3597,33 @@ async function apiRegalosPedido(request, env, url) {
   /* Qué se escogió y si sigue libre. Los valores salen de la categoría, nunca
      del navegador. */
   const marcas = codigos.map(() => "?").join(",");
-  const { results } = await env.DB.prepare(
+  const { results } = bolsa ? { results: [] } : await env.DB.prepare(
     "SELECT r.id, r.codigo, CASE WHEN " + REGALO_LIBRE + " THEN 1 ELSE 0 END AS libre, " +
-    "k.valor_cop, k.valor_usd FROM regalos r JOIN regalo_categorias k ON k.id = r.categoria_id " +
+    "k.valor_cop, k.valor_usd, k.valor_eur FROM regalos r JOIN regalo_categorias k ON k.id = r.categoria_id " +
     "WHERE r.campana_id = ? AND r.codigo IN (" + marcas + ")"
   ).bind(REGALOS_CAMPANA, ...codigos).all();
   const filas = results || [];
   const tomados = codigos.filter((k) => {
     const f = filas.find((x) => x.codigo === k);
-    return !f || !f.libre || f.valor_cop == null || f.valor_usd == null;
+    return !f || !f.libre || f.valor_cop == null || f.valor_usd == null || (moneda === "EUR" && f.valor_eur == null);
   });
   if (tomados.length) return json({ error: "no_disponibles", codigos: tomados }, 409);
 
-  const totalCop = filas.reduce((s, f) => s + Number(f.valor_cop), 0);
-  const totalUsd = filas.reduce((s, f) => s + Number(f.valor_usd), 0);
-  if (via === "cop" && (totalCop < MONTO_MIN || totalCop > MONTO_MAX)) {
+  let totalCop = filas.reduce((s, f) => s + Number(f.valor_cop), 0);
+  let totalUsd = filas.reduce((s, f) => s + Number(f.valor_usd), 0);
+  let totalEur = moneda === "EUR" ? filas.reduce((s, f) => s + Number(f.valor_eur), 0) : null;
+  if (bolsa) {
+    /* El monto lo pone el donante, en su moneda; solo esa columna se llena. */
+    const m = Number(c.monto);
+    const max = moneda === "COP" ? MONTO_MAX : REGALOS_BOLSA_MAX[moneda];
+    if (!Number.isInteger(m) || m < REGALOS_BOLSA_MIN[moneda] || m > max) {
+      return json({ error: "monto_invalido", min: REGALOS_BOLSA_MIN[moneda], max, moneda }, 400);
+    }
+    totalCop = moneda === "COP" ? m : null;
+    totalUsd = moneda === "USD" ? m : null;
+    totalEur = moneda === "EUR" ? m : null;
+  }
+  if (via === "cop" && !bolsa && (totalCop < MONTO_MIN || totalCop > MONTO_MAX)) {
     return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
   }
 
@@ -3608,7 +3640,7 @@ async function apiRegalosPedido(request, env, url) {
     : via === "usd" || canal === "banco" ? "+" + REGALOS_RESERVA_USD_H + " hours"
     : "+" + REGALOS_RESERVA_MIN + " minutes";
 
-  await env.DB.batch(filas.map((f) => env.DB.prepare(
+  if (filas.length) await env.DB.batch(filas.map((f) => env.DB.prepare(
     "UPDATE regalos AS r SET reserva_ref = ?, reservado_hasta = datetime('now', ?), " +
     "actualizado_en = datetime('now') WHERE r.id = ? AND " + REGALO_LIBRE
   ).bind(ref, plazo, f.id)));
@@ -3622,17 +3654,17 @@ async function apiRegalosPedido(request, env, url) {
   }
 
   const lote = [env.DB.prepare(
-    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, canal, total_cop, total_usd, nombre, email, telefono, idioma" +
-    (embajador ? ", embajador" : "") + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (embajador ? ", ?" : "") + ")"
-  ).bind(ref, REGALOS_CAMPANA, token, via, canal, totalCop, totalUsd, nombre, email, telefono, idioma, ...(embajador ? [embajador] : []))];
+    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, canal, moneda, bolsa, total_cop, total_usd, total_eur, nombre, email, telefono, idioma" +
+    (embajador ? ", embajador" : "") + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (embajador ? ", ?" : "") + ")"
+  ).bind(ref, REGALOS_CAMPANA, token, via, canal, moneda, bolsa, totalCop, totalUsd, totalEur, nombre, email, telefono, idioma, ...(embajador ? [embajador] : []))];
   for (const f of filas) {
     lote.push(env.DB.prepare(
-      "INSERT INTO regalo_pedido_items (pedido_ref, regalo_id, valor_cop, valor_usd) VALUES (?, ?, ?, ?)"
-    ).bind(ref, f.id, f.valor_cop, f.valor_usd));
+      "INSERT INTO regalo_pedido_items (pedido_ref, regalo_id, valor_cop, valor_usd, valor_eur) VALUES (?, ?, ?, ?, ?)"
+    ).bind(ref, f.id, f.valor_cop, f.valor_usd, f.valor_eur == null ? null : f.valor_eur));
   }
   lote.push(env.DB.prepare(
     "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'pedido', ?, 'sistema')"
-  ).bind(ref, (canal || via) + " · " + codigos.join(", ")));
+  ).bind(ref, (canal || via) + " · " + moneda + " · " + (bolsa ? "bolsa " + (totalCop || totalUsd || totalEur) : codigos.join(", "))));
   await env.DB.batch(lote);
   /* La carta y la autorización de noticias no pueden tumbar el pedido. */
   try {
@@ -3643,26 +3675,26 @@ async function apiRegalosPedido(request, env, url) {
   const seguimiento = enlaceSeguimientoRegalos(ref, token);
 
   if (canal === "paypal") {
-    const r = await regalosPaypalCrear(env, url, ppCfg, { ref, token, idioma, totalUsd, n: codigos.length });
+    const r = await regalosPaypalCrear(env, url, ppCfg, { ref, token, idioma, moneda, total: moneda === "EUR" ? totalEur : totalUsd, n: codigos.length, bolsa, pagina: String(c.pagina || "") });
     if (!r) {
       /* Sin pedido en PayPal no hay a dónde ir: se suelta todo, para que el
          regalo no quede apartado una hora por un fallo ajeno. */
       await regalosSoltarPedido(env, ref, "fallido", "paypal");
       return json({ error: "paypal_fallo" }, 502);
     }
-    return json({ ref, token, via, canal, url: r, seguimiento, total_usd: totalUsd });
+    return json({ ref, token, via, canal, moneda, bolsa: !!bolsa, url: r, seguimiento, total_usd: totalUsd, total_eur: totalEur });
   }
 
   if (canal === "banco") {
     let b;
-    try { b = await regalosBancoAporte(env, { ref, nombre, email, telefono, idioma, totalCop, quiereCert, muro, certDatos, codigos }); }
+    try { b = await regalosBancoAporte(env, { ref, nombre, email, telefono, idioma, totalCop, quiereCert, muro, certDatos, codigos, bolsa }); }
     catch (e) {
       /* Sin aporte no hay nada que verificar contra el extracto: se suelta. */
       console.error("pedido banco", ref, e && e.message);
       await regalosSoltarPedido(env, ref, "fallido", "banco");
       return json({ error: "error_interno" }, 500);
     }
-    return json({ ref, token, via, canal, guia: b.guia, aporte_token: b.token, seguimiento,
+    return json({ ref, token, via, canal, moneda, bolsa: !!bolsa, guia: b.guia, aporte_token: b.token, seguimiento,
       total_cop: totalCop, total_usd: totalUsd, banco: REGALOS_BANCO, reserva_h: REGALOS_RESERVA_USD_H });
   }
 
@@ -3677,7 +3709,7 @@ async function apiRegalosPedido(request, env, url) {
 
   /* En pesos: un aporte normal, con su guía, su recibo y su certificado. */
   const guia = await siguienteGuia(env, anioCO());
-  const proyecto = (idioma === "en" ? "December gifts · " : "Regalos de diciembre · ") + ref;
+  const proyecto = (idioma === "en" ? "December gifts · " : "Regalos de diciembre · ") + (bolsa ? (idioma === "en" ? "common pool · " : "bolsa común · ") : "") + ref;
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
     "frecuencia, quiere_certificado, consent_muro, nota, idioma, token, certificado_datos) " +
@@ -3687,7 +3719,7 @@ async function apiRegalosPedido(request, env, url) {
 
   const pago = await urlCheckoutWompi(env, url, guia, totalCop * 100,
     "/gracias?rg=" + encodeURIComponent(ref) + "&rt=" + encodeURIComponent(token));
-  return json({ ref, token, via, guia, url: pago.url, modo: pago.modo, seguimiento, total_cop: totalCop });
+  return json({ ref, token, via, moneda, bolsa: !!bolsa, guia, url: pago.url, modo: pago.modo, seguimiento, total_cop: totalCop });
 }
 
 /* LA TRANSFERENCIA DIRECTA (0070). El aporte nace `reportada` y con eso entra a
@@ -3711,7 +3743,7 @@ async function regalosBancoAporte(env, x) {
     "frecuencia, quiere_certificado, consent_muro, nota, idioma, token, donante_id, metodo_pago, " +
     "referencia_pago, fecha_pago, certificado_datos) " +
     "VALUES (?, 'reportada', ?, 'COP', 'fondo', NULL, ?, 'unico', ?, ?, ?, ?, ?, ?, 'TRANSFERENCIA', ?, ?, ?)"
-  ).bind(guia, x.totalCop * 100, (en ? "December gifts · " : "Regalos de diciembre · ") + x.ref,
+  ).bind(guia, x.totalCop * 100, (en ? "December gifts · " : "Regalos de diciembre · ") + (x.bolsa ? (en ? "common pool · " : "bolsa común · ") : "") + x.ref,
          x.quiereCert, x.muro,
          "Pedido de regalos " + x.ref + ": eligió pagar directamente al banco. Puede venir del exterior " +
          "(llega en pesos tras el cambio, con otro monto: confírmalo con lo que entró).",
@@ -3721,7 +3753,7 @@ async function regalosBancoAporte(env, x) {
                            "pedido de regalos " + x.ref + " · $" + x.totalCop + " COP", "aporte");
   try {
     await correoRegalosPedidoBanco(env, { ref: x.ref, guia, nombre: x.nombre, email: x.email,
-      idioma: x.idioma, totalCop: x.totalCop, n: x.codigos.length });
+      idioma: x.idioma, totalCop: x.totalCop, n: x.codigos.length, bolsa: x.bolsa });
     await correoAvisoTransferencia(env, { guia, monto: x.totalCop, email: x.email, nombre: x.nombre,
       telefono: x.telefono, fecha: fechaCO(new Date().toISOString()) + " (pedido; aún sin transferir)", refer: x.ref,
       destino: "Regalos de diciembre · " + x.ref });
@@ -3734,12 +3766,12 @@ async function correoRegalosPedidoBanco(env, x) {
   const titulo = (en ? "Your gift order " : "Tu pedido de regalos ") + x.ref;
   const parrafos = en ? [
     "Hi " + x.nombre + ",",
-    "We are holding your " + x.n + " gift(s) for " + REGALOS_RESERVA_USD_H + " hours while you make the bank transfer.",
+    x.bolsa ? "Thank you for your contribution to the common gift pool. When the pool reaches the value of a gift, the team assigns it to a child and we tell you who." : "We are holding your " + x.n + " gift(s) for " + REGALOS_RESERVA_USD_H + " hours while you make the bank transfer.",
     "Write " + x.ref + " in the transfer reference, so we can match it. From outside Colombia, use the SWIFT code: your bank converts the money to Colombian pesos and may charge its own fees.",
     "We confirm every transfer against our bank statement. Then your gifts show as funded and your receipt (" + x.guia + ") reaches you."
   ] : [
     "Hola, " + x.nombre + ":",
-    "Apartamos tus " + x.n + " regalo(s) por " + REGALOS_RESERVA_USD_H + " horas mientras haces la transferencia.",
+    x.bolsa ? "Gracias por tu aporte a la bolsa común de regalos. Cuando la bolsa alcanza el valor de un regalo, el equipo lo asigna a un niño y te contamos a quién." : "Apartamos tus " + x.n + " regalo(s) por " + REGALOS_RESERVA_USD_H + " horas mientras haces la transferencia.",
     "Escribe " + x.ref + " en el concepto o la referencia de la transferencia: así la asociamos a tus regalos. Desde fuera de Colombia, usa el código SWIFT: tu banco convierte el dinero a pesos colombianos y puede cobrar sus propios costos.",
     "Confirmamos cada transferencia contra el extracto del banco. Entonces tus regalos quedan financiados y te llega tu recibo (" + x.guia + ")."
   ];
@@ -3773,13 +3805,16 @@ async function regalosPaypalCrear(env, url, cfg, x) {
   try {
     const tk = await paypalToken(cfg);
     const en = x.idioma === "en";
-    const volver = url.origin + "/regalos?rg=" + encodeURIComponent(x.ref) + "&rt=" + encodeURIComponent(x.token) + "&pp=1";
+    /* Se vuelve a la página en el idioma en que se pagó (fr y sv solo existen en regalos). */
+    const volver = url.origin + "/regalos?rg=" + encodeURIComponent(x.ref) + "&rt=" + encodeURIComponent(x.token) + "&pp=1" +
+      (["en", "sv", "fr"].includes(x.pagina) ? "&lang=" + x.pagina : "");
     const r = await paypalPost(cfg, tk, "/v2/checkout/orders", {
       intent: "CAPTURE",
       purchase_units: [{
         reference_id: x.ref, custom_id: x.ref, invoice_id: x.ref,
-        description: (en ? "December gifts · " : "Regalos de diciembre · ") + x.n + (en ? " gift(s) · " : " regalo(s) · ") + x.ref,
-        amount: { currency_code: "USD", value: Number(x.totalUsd).toFixed(2) }
+        description: (en ? "December gifts · " : "Regalos de diciembre · ") +
+          (x.bolsa ? (en ? "common pool · " : "bolsa común · ") : x.n + (en ? " gift(s) · " : " regalo(s) · ")) + x.ref,
+        amount: { currency_code: x.moneda === "EUR" ? "EUR" : "USD", value: Number(x.total).toFixed(2) }
       }],
       payment_source: { paypal: { experience_context: {
         brand_name: "Give&Grow International", shipping_preference: "NO_SHIPPING",
@@ -3831,7 +3866,7 @@ async function apiRegalosPaypalCapturar(request, env, ref, token) {
    dinero existe y una persona decide. */
 async function regalosPaypalCobro(env, ref, cap) {
   const p = await env.DB.prepare(
-    "SELECT ref, canal, estado, total_usd, idioma, email, nombre, guia FROM regalo_pedidos WHERE ref = ?"
+    "SELECT ref, canal, via, moneda, bolsa, estado, total_usd, total_eur, idioma, email, nombre, guia FROM regalo_pedidos WHERE ref = ?"
   ).bind(ref).first();
   if (!p || p.canal !== "paypal") return "pedido_desconocido";
   if (String(cap.custom_id || "") !== ref) return "otro_pedido";
@@ -3843,9 +3878,10 @@ async function regalosPaypalCobro(env, ref, cap) {
   if (!capId) return "captura_sin_id";
   const ya = await env.DB.prepare("SELECT guia FROM aportes WHERE proveedor = 'paypal' AND proveedor_ref = ?").bind(capId).first();
   if (ya) return "ya_pagado";
-  if (moneda !== "USD" || Math.round(valor * 100) !== Math.round(Number(p.total_usd) * 100)) {
+  const esperada = monedaPedido(p), totalEsp = totalPedido(p);
+  if (moneda !== esperada || Math.round(valor * 100) !== Math.round(Number(totalEsp) * 100)) {
     await anotarIncidente(env, "regalos-paypal-monto", ref,
-      "PayPal cobró " + moneda + " " + valor + " al pedido " + ref + ", que vale US$" + p.total_usd + ": no se financió nada, revísalo");
+      "PayPal cobró " + moneda + " " + valor + " al pedido " + ref + ", que vale " + esperada + " " + totalEsp + ": no se financió nada, revísalo");
     return "monto_distinto";
   }
   const guia = await siguienteGuia(env, anioCO());
@@ -3853,8 +3889,8 @@ async function regalosPaypalCobro(env, ref, cap) {
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
     "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, donante_id, aprobada_en) " +
-    "VALUES (?, 'aprobada', ?, 'USD', 'fondo', NULL, ?, 'unico', 0, 'no', ?, ?, 'paypal', ?, ?, datetime('now'))"
-  ).bind(guia, Math.round(valor * 100), (p.idioma === "en" ? "December gifts · " : "Regalos de diciembre · ") + ref,
+    "VALUES (?, 'aprobada', ?, ?, 'fondo', NULL, ?, 'unico', 0, 'no', ?, ?, 'paypal', ?, ?, datetime('now'))"
+  ).bind(guia, Math.round(valor * 100), esperada, (p.idioma === "en" ? "December gifts · " : "Regalos de diciembre · ") + (p.bolsa ? (p.idioma === "en" ? "common pool · " : "bolsa común · ") : "") + ref,
          p.idioma, tokenNuevo(), capId, donanteId).run();
   await env.DB.prepare("UPDATE regalo_pedidos SET guia = ? WHERE ref = ?").bind(guia, ref).run();
   await regalosPedidoPagado(env, ref, "paypal");
@@ -3882,6 +3918,120 @@ async function regalosTrasAporte(env, guia, nuevo, yaAprobada, autor) {
   }
 }
 
+/* LA BOLSA COMÚN (0072). Dos correos: al llegar el aporte («entró a la
+   bolsa») y cada vez que una parte de él completa un regalo («fue para…»). */
+function fmtMonedaBolsa(moneda, n){
+  return moneda === "EUR" ? n + " €" : moneda === "USD" ? "US$" + n : fmtPesos(Number(n) * 100);
+}
+async function correoRegalosBolsa(env, ref, uso) {
+  const p = await env.DB.prepare(
+    "SELECT ref, token, email, nombre, idioma, via, moneda, total_cop, total_usd, total_eur, guia FROM regalo_pedidos WHERE ref = ? AND bolsa = 1"
+  ).bind(ref).first();
+  if (!p || !p.email) return;
+  const en = p.idioma === "en", mon = monedaPedido(p);
+  const enlace = enlaceSeguimientoRegalos(p.ref, p.token);
+  let titulo, parrafos;
+  if (!uso) {
+    titulo = (en ? "Your contribution is in the gift pool · " : "Tu aporte entró a la bolsa de regalos · ") + p.ref;
+    parrafos = en ? [
+      "Hi " + p.nombre + ",",
+      "Your " + fmtMonedaBolsa(mon, totalPedido(p)) + " is now in the common gift pool, together with other people's contributions.",
+      "When the pool reaches the value of a gift, the team assigns it to a child still waiting, and we email you the name, age and area of the child your money helped."
+    ] : [
+      "Hola, " + p.nombre + ":",
+      "Tu aporte de " + fmtMonedaBolsa(mon, totalPedido(p)) + " ya está en la bolsa común de regalos, junto con el de otras personas.",
+      "Cuando la bolsa alcanza el valor de un regalo, el equipo lo asigna a un niño que sigue esperando, y te escribimos el nombre, la edad y la zona del niño al que llegó tu dinero."
+    ];
+    if (mon === "COP" && p.guia) parrafos.push(en ? "Your receipt (" + p.guia + ") arrives in a separate email." : "Tu recibo (" + p.guia + ") llega en un correo aparte.");
+  } else {
+    titulo = (en ? "Your contribution completed a gift · " : "Tu aporte completó un regalo · ") + p.ref;
+    parrafos = en ? [
+      "Hi " + p.nombre + ",",
+      fmtMonedaBolsa(mon, uso.monto) + " of your contribution went to " + uso.nombre + ", " + uso.edad + ", in " + uso.zona_en + ": " + (uso.deseo_en || uso.deseo_es) + ".",
+      "You can follow that gift until it is delivered, with its delivery record, from your tracking link."
+    ] : [
+      "Hola, " + p.nombre + ":",
+      fmtMonedaBolsa(mon, uso.monto) + " de tu aporte fueron para " + uso.nombre + ", " + uso.edad + " años, de " + uso.zona_es + ": " + uso.deseo_es + ".",
+      "Puedes seguir ese regalo hasta que se entregue, con su acta, desde tu enlace de seguimiento."
+    ];
+  }
+  await enviarCorreo(env, {
+    para: p.email, asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", (en ? "Follow: " : "Seguimiento: ") + enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos,
+      boton: { url: enlace, texto: en ? "Follow your contribution" : "Sigue tu aporte" },
+      cierre: en ? "This is an automatic message from Fundación Give&Grow International." : "Este mensaje es automático." }),
+    etiqueta: uso ? "regalos-bolsa-uso" : "regalos-bolsa", guia: p.ref
+  });
+}
+
+/* POST /api/admin/regalos/bolsa-asignar {codigo, moneda}
+   Financia UN regalo con lo que hay en la bolsa de esa moneda. El dinero se
+   toma de los aportes pagados en orden de llegada (los más viejos primero) y
+   cada toma queda en `regalo_bolsa_usos`. Cada UPDATE lleva su condición en el
+   WHERE: dos pestañas a la vez no pueden gastar dos veces el mismo saldo ni
+   financiar dos veces el mismo regalo. */
+async function adminRegalosBolsaAsignar(env, c, quien) {
+  const moneda = ["COP", "USD", "EUR"].includes(c.moneda) ? c.moneda : null;
+  const codigo = String(c.codigo || "").toUpperCase().trim();
+  if (!moneda || !RE_CODIGO_REGALO.test(codigo)) return json({ error: "datos_invalidos", ayuda: "Escribe el código del niño (LET-0001) y la moneda." }, 400);
+  const col = moneda === "EUR" ? "valor_eur" : moneda === "USD" ? "valor_usd" : "valor_cop";
+  const r = await env.DB.prepare(
+    "SELECT r.id, r.codigo, r.deseo_es, r.deseo_en, k." + col + " AS valor, n.nombre_publico, n.edad, z.nombre_es AS zona_es, z.nombre_en AS zona_en, " +
+    "CASE WHEN " + REGALO_LIBRE + " THEN 1 ELSE 0 END AS libre FROM regalos r JOIN regalo_categorias k ON k.id = r.categoria_id " +
+    "JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_zonas z ON z.id = r.zona_id WHERE r.campana_id = ? AND r.codigo = ?"
+  ).bind(REGALOS_CAMPANA, codigo).first();
+  if (!r) return json({ error: "no_encontrado", ayuda: "No hay un niño con ese código en la campaña." }, 404);
+  if (!r.libre) return json({ error: "no_disponible", ayuda: "Ese regalo ya está apartado o financiado. Escoge otro." }, 409);
+  if (!(Number(r.valor) > 0)) return json({ error: "sin_valor", ayuda: "Ese tipo de regalo no tiene valor en " + moneda + "." }, 409);
+  const { results } = await env.DB.prepare(
+    "SELECT ref, " + (moneda === "EUR" ? "total_eur" : moneda === "USD" ? "total_usd" : "total_cop") + " AS total, bolsa_usado FROM regalo_pedidos " +
+    "WHERE campana_id = ? AND bolsa = 1 AND estado = 'pagado' AND COALESCE(moneda, CASE WHEN via = 'usd' THEN 'USD' ELSE 'COP' END) = ? " +
+    "ORDER BY pagado_en, ref"
+  ).bind(REGALOS_CAMPANA, moneda).all();
+  const fuentes = (results || []).map((x) => ({ ref: x.ref, libre: Number(x.total) - Number(x.bolsa_usado) })).filter((x) => x.libre > 0);
+  const saldo = fuentes.reduce((a, x) => a + x.libre, 0);
+  if (saldo < r.valor) return json({ error: "saldo_insuficiente", saldo, valor: r.valor,
+    ayuda: "La bolsa en " + moneda + " tiene " + fmtMonedaBolsa(moneda, saldo) + " y ese regalo vale " + fmtMonedaBolsa(moneda, r.valor) + "." }, 409);
+  /* Primero se aparta el regalo: si otro lo tomó en el medio, no se gasta nada. */
+  const tomo = await env.DB.prepare(
+    "UPDATE regalos AS r SET estado = 'financiado', via = 'fondo', financiado_por = 'bolsa', financiado_en = datetime('now'), " +
+    "reserva_ref = NULL, reservado_hasta = NULL, actualizado_en = datetime('now') WHERE r.id = ? AND " + REGALO_LIBRE
+  ).bind(r.id).run();
+  if (!tomo.meta || !tomo.meta.changes) return json({ error: "no_disponible", ayuda: "Alguien tomó ese regalo mientras tanto. Escoge otro." }, 409);
+  let falta = Number(r.valor); const usos = [];
+  for (const f of fuentes) {
+    if (!falta) break;
+    const m = Math.min(f.libre, falta);
+    const u = await env.DB.prepare(
+      "UPDATE regalo_pedidos SET bolsa_usado = bolsa_usado + ? WHERE ref = ? AND bolsa_usado + ? <= " +
+      (moneda === "EUR" ? "total_eur" : moneda === "USD" ? "total_usd" : "total_cop")
+    ).bind(m, f.ref, m).run();
+    if (!u.meta || !u.meta.changes) continue;
+    await env.DB.prepare("INSERT INTO regalo_bolsa_usos (regalo_id, pedido_ref, moneda, monto, creado_por) VALUES (?, ?, ?, ?, ?)")
+      .bind(r.id, f.ref, moneda, m, quien || null).run();
+    usos.push({ ref: f.ref, monto: m }); falta -= m;
+  }
+  if (falta > 0) {
+    /* Otra asignación gastó el saldo en paralelo: se deshace lo tomado. */
+    for (const u of usos) {
+      await env.DB.prepare("UPDATE regalo_pedidos SET bolsa_usado = bolsa_usado - ? WHERE ref = ?").bind(u.monto, u.ref).run();
+    }
+    await env.DB.prepare("DELETE FROM regalo_bolsa_usos WHERE regalo_id = ?").bind(r.id).run();
+    await env.DB.prepare("UPDATE regalos SET estado = 'publicado', via = NULL, financiado_por = NULL, financiado_en = NULL WHERE id = ?").bind(r.id).run();
+    return json({ error: "saldo_insuficiente", ayuda: "El saldo cambió mientras tanto. Recarga y vuelve a intentarlo." }, 409);
+  }
+  await env.DB.prepare("INSERT INTO regalo_eventos (regalo_id, tipo, detalle, autor) VALUES (?, 'financiado', ?, ?)")
+    .bind(r.id, "bolsa " + moneda + " · " + usos.map((u) => u.ref + " " + u.monto).join(", "), quien || "?").run();
+  await adminRegalosAuditar(env, quien, "financió " + r.codigo + " desde la bolsa en " + moneda + " (" + usos.map((u) => u.ref).join(", ") + ")");
+  for (const u of usos) {
+    try {
+      await correoRegalosBolsa(env, u.ref, { monto: u.monto, nombre: r.nombre_publico, edad: r.edad, zona_es: r.zona_es, zona_en: r.zona_en, deseo_es: r.deseo_es, deseo_en: r.deseo_en });
+    } catch (e) { console.error("correo uso bolsa", u.ref, e && e.message); }
+  }
+  return json({ ok: true, codigo: r.codigo, moneda, valor: r.valor, usos });
+}
+
 async function regalosSoltarPedido(env, ref, estado, autor) {
   await env.DB.batch([
     env.DB.prepare(
@@ -3904,14 +4054,17 @@ async function regalosPedidoPagado(env, ref, autor) {
   const cambio = await env.DB.prepare(
     "UPDATE regalo_pedidos SET estado = 'pagado', pagado_en = datetime('now'), " +
     "confirmado_por = CASE WHEN via = 'usd' OR canal = 'banco' THEN ? ELSE confirmado_por END, actualizado_en = datetime('now') " +
-    "WHERE ref = ? AND estado IN ('pendiente', 'vencido', 'fallido') RETURNING via"
+    "WHERE ref = ? AND estado IN ('pendiente', 'vencido', 'fallido') RETURNING via, moneda, bolsa"
   ).bind(autor || null, ref).first();
   if (!cambio) return { ya: true };
   const via = cambio.via;
+  /* La sustitución compara en la moneda en que se pagó (0072: también euros). */
+  const mon = monedaPedido(cambio);
+  const colValor = mon === "EUR" ? "valor_eur" : mon === "USD" ? "valor_usd" : "valor_cop";
   try { await regalosRenovarNoticias(env, ref); } catch (e) { console.error("noticias", ref, e && e.message); }
 
   const { results } = await env.DB.prepare(
-    "SELECT i.id, i.regalo_id, i.valor_cop, i.valor_usd, r.zona_id, r.categoria_id " +
+    "SELECT i.id, i.regalo_id, i.valor_cop, i.valor_usd, i.valor_eur, r.zona_id, r.categoria_id " +
     "FROM regalo_pedido_items i JOIN regalos r ON r.id = i.regalo_id WHERE i.pedido_ref = ?"
   ).bind(ref).all();
   const financiar = (id) => env.DB.prepare(
@@ -3938,9 +4091,9 @@ async function regalosPedidoPagado(env, ref, autor) {
         "SELECT r.id FROM regalos r JOIN regalo_categorias k ON k.id = r.categoria_id " +
         "JOIN regalo_ninos n ON n.id = r.nino_id " +
         "WHERE r.campana_id = ? AND r.zona_id = ? AND " + NINO_PUBLICABLE + " AND " + REGALO_LIBRE + " " +
-        "AND " + (via === "usd" ? "k.valor_usd <= ?" : "k.valor_cop <= ?") + " " +
+        "AND k." + colValor + " <= ? " +
         "ORDER BY (r.categoria_id = ?) DESC, r.id LIMIT 1"
-      ).bind(REGALOS_CAMPANA, it.zona_id, via === "usd" ? it.valor_usd : it.valor_cop, it.categoria_id).first();
+      ).bind(REGALOS_CAMPANA, it.zona_id, it[colValor], it.categoria_id).first();
       if (!cand) break;
       r = await financiar(cand.id);
       if (r.meta && r.meta.changes) sustituto = cand.id;
@@ -3963,6 +4116,8 @@ async function regalosPedidoPagado(env, ref, autor) {
     ).bind(ref, JSON.stringify(resumen), autor || "sistema")
   ]);
 
+  /* Un aporte a la bolsa no tiene regalos propios: su correo es otro. */
+  if (cambio.bolsa) { try { await correoRegalosBolsa(env, ref, null); } catch (e) { console.error("correo bolsa", ref, e && e.message); } }
   try { await correoRegalosEstado(env, ref, "financiado"); }
   catch (e) { console.error("correo regalos financiados", ref, e && e.message); }
   if (resumen.sin_cupo && env.CORREO_AVISOS) {
@@ -3985,7 +4140,7 @@ async function regalosPedidoPagado(env, ref, autor) {
 async function apiRegalosSeguimiento(env, ref, token) {
   if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return json({ error: "no_encontrado" }, 404);
   const p = await env.DB.prepare(
-    "SELECT ref, token, via, canal, estado, total_cop, total_usd, guia, idioma, creado_en, pagado_en " +
+    "SELECT ref, token, via, canal, moneda, bolsa, bolsa_usado, estado, total_cop, total_usd, total_eur, guia, idioma, creado_en, pagado_en " +
     "FROM regalo_pedidos WHERE ref = ?"
   ).bind(ref).first();
   if (!p || !igualesSeguro(p.token, token)) return json({ error: "no_encontrado" }, 404);
@@ -4032,9 +4187,27 @@ async function apiRegalosSeguimiento(env, ref, token) {
   });
   const mensaje = await regalosMensajeDe(env, ref);
   const editable = await regalosMensajeEditable(env, p);
+  /* Un aporte a la bolsa (0072): a qué niños fue su dinero, con su recorrido. */
+  let bolsa = null;
+  if (p.bolsa) {
+    let usos = [];
+    try {
+      usos = ((await env.DB.prepare(
+        "SELECT u.monto, r.codigo, r.deseo_es, r.deseo_en, r.estado, r.financiado_en, r.comprado_en, r.despachado_en, r.entregado_en, r.entrega, " +
+        "n.nombre_publico, n.edad, z.nombre_es AS zona_es, z.nombre_en AS zona_en, z.departamento " +
+        "FROM regalo_bolsa_usos u JOIN regalos r ON r.id = u.regalo_id JOIN regalo_ninos n ON n.id = r.nino_id " +
+        "JOIN regalo_zonas z ON z.id = r.zona_id WHERE u.pedido_ref = ? ORDER BY u.id"
+      ).bind(ref).all()).results || []).map((u) => ({
+        monto: u.monto, codigo: u.codigo, nombre: u.nombre_publico, edad: u.edad, deseo_es: u.deseo_es, deseo_en: u.deseo_en || null,
+        zona_es: u.zona_es, zona_en: u.zona_en, departamento: u.departamento, estado: u.estado,
+        financiado_en: f(u.financiado_en), comprado_en: f(u.comprado_en), despachado_en: f(u.despachado_en), entregado_en: f(u.entregado_en), acta: u.entrega || null
+      }));
+    } catch (e) { console.error("usos bolsa", ref, e && e.message); }
+    bolsa = { usado: p.bolsa_usado || 0, usos };
+  }
   return json({
-    ref: p.ref, via: p.via, canal: p.canal || null, estado: p.estado, pago, guia: p.guia, mensaje, mensaje_editable: editable,
-    total_cop: p.total_cop, total_usd: p.total_usd,
+    ref: p.ref, via: p.via, canal: p.canal || null, moneda: monedaPedido(p), bolsa, estado: p.estado, pago, guia: p.guia, mensaje, mensaje_editable: editable,
+    total_cop: p.total_cop, total_usd: p.total_usd, total_eur: p.total_eur,
     creado_en: f(p.creado_en), pagado_en: f(p.pagado_en),
     banco: p.canal === "banco" && p.estado === "pendiente" ? REGALOS_BANCO : null,
     comprobante,
@@ -4420,7 +4593,7 @@ async function adminRegalos(env) {
   }
   const zonas = await regalosZonas(env);
   const cats = await env.DB.prepare(
-    "SELECT id, nombre_es, nombre_en, valor_cop, valor_usd, con_talla FROM regalo_categorias ORDER BY orden"
+    "SELECT id, nombre_es, nombre_en, valor_cop, valor_usd, valor_eur, con_talla FROM regalo_categorias ORDER BY orden"
   ).all();
   const ninos = await env.DB.prepare(
     "SELECT n.codigo, n.zona_id, n.nombre, n.nombre_publico, n.edad, n.genero, n.comunidad, " +
@@ -4435,7 +4608,7 @@ async function adminRegalos(env) {
     "WHERE n.campana_id = ? ORDER BY n.codigo"
   ).bind(REGALOS_CAMPANA).all();
   const pedidos = await env.DB.prepare(
-    "SELECT p.ref, p.via, p.canal, p.estado, p.total_cop, p.total_usd, p.nombre, p.email, p.guia, p.creado_en, p.pagado_en, " +
+    "SELECT p.ref, p.via, p.canal, p.moneda, p.bolsa, p.bolsa_usado, p.estado, p.total_cop, p.total_usd, p.total_eur, p.nombre, p.email, p.guia, p.creado_en, p.pagado_en, " +
     "p.confirmado_por, COUNT(i.id) AS items, SUM(CASE WHEN i.resultado = 'sin_cupo' THEN 1 ELSE 0 END) AS sin_cupo, " +
     "SUM(CASE WHEN i.resultado = 'sustituido' THEN 1 ELSE 0 END) AS sustituidos " +
     "FROM regalo_pedidos p LEFT JOIN regalo_pedido_items i ON i.pedido_ref = p.ref " +
@@ -4465,8 +4638,21 @@ async function adminRegalos(env) {
       "FROM regalo_embajadores e ORDER BY e.activo DESC, regalos DESC, e.nombre"
     ).all()).results || [];
   } catch { embajadores = null; }
+  /* La bolsa común (0072): saldo por moneda = lo aportado y pagado menos lo
+     que ya financió regalos. Sin la migración, null. */
+  let bolsa = null;
+  try {
+    const b = (await env.DB.prepare(
+      "SELECT ref, via, moneda, total_cop, total_usd, total_eur, bolsa_usado FROM regalo_pedidos " +
+      "WHERE campana_id = ? AND bolsa = 1 AND estado = 'pagado'"
+    ).bind(REGALOS_CAMPANA).all()).results || [];
+    const acc = { COP: { aportes: 0, aportado: 0, usado: 0 }, USD: { aportes: 0, aportado: 0, usado: 0 }, EUR: { aportes: 0, aportado: 0, usado: 0 } };
+    for (const x of b) { const m = monedaPedido(x); acc[m].aportes++; acc[m].aportado += Number(totalPedido(x)) || 0; acc[m].usado += Number(x.bolsa_usado) || 0; }
+    const regalos = (await env.DB.prepare("SELECT COUNT(DISTINCT regalo_id) AS n FROM regalo_bolsa_usos").first()) || { n: 0 };
+    bolsa = { monedas: acc, regalos: regalos.n };
+  } catch { bolsa = null; }
   return json({
-    embajadores, origen: ORIGIN,
+    embajadores, bolsa, origen: ORIGIN,
     mensajes: (mens.results || []).map((m) => Object.assign({}, m, {
       video: !!m.video, actualizado_en: m.actualizado_en ? selloCO(m.actualizado_en).slice(0, 16) : null,
       regalos: String(m.regalos || "").split(";").filter(Boolean).map((x) => {
@@ -4701,16 +4887,20 @@ async function adminRegalosAccion(request, env, accion, quien) {
   if (accion === "categoria") {
     const vc = c.valor_cop === "" || c.valor_cop == null ? null : Number(c.valor_cop);
     const vu = c.valor_usd === "" || c.valor_usd == null ? null : Number(c.valor_usd);
+    const ve = c.valor_eur === "" || c.valor_eur == null ? null : Number(c.valor_eur);
+    if (ve != null && (!Number.isInteger(ve) || ve < 1 || ve > 5000)) {
+      return json({ error: "valor_invalido", ayuda: "Euros enteros, entre 1 y 5000." }, 400);
+    }
     if (vc != null && (!Number.isInteger(vc) || vc < MONTO_MIN || vc > MONTO_MAX)) {
       return json({ error: "valor_invalido", ayuda: "Pesos enteros, entre " + MONTO_MIN + " y " + MONTO_MAX + "." }, 400);
     }
     if (vu != null && (!Number.isInteger(vu) || vu < 1 || vu > 5000)) {
       return json({ error: "valor_invalido", ayuda: "Dólares enteros, entre 1 y 5000." }, 400);
     }
-    const r = await env.DB.prepare("UPDATE regalo_categorias SET valor_cop = ?, valor_usd = ? WHERE id = ?")
-      .bind(vc, vu, limpiar(c.id, 30)).run();
+    const r = await env.DB.prepare("UPDATE regalo_categorias SET valor_cop = ?, valor_usd = ?, valor_eur = ? WHERE id = ?")
+      .bind(vc, vu, ve, limpiar(c.id, 30)).run();
     if (!r.meta || !r.meta.changes) return json({ error: "no_encontrada" }, 404);
-    await adminRegalosAuditar(env, quien, "tipo " + c.id + " · $" + (vc == null ? "—" : vc) + " · US$" + (vu == null ? "—" : vu));
+    await adminRegalosAuditar(env, quien, "tipo " + c.id + " · $" + (vc == null ? "—" : vc) + " · US$" + (vu == null ? "—" : vu) + " · " + (ve == null ? "—" : ve) + " €");
     return json({ ok: true });
   }
 
@@ -4787,6 +4977,7 @@ async function adminRegalosAccion(request, env, accion, quien) {
   }
 
   if (accion === "estado") return adminRegalosMover(env, c, quien);
+  if (accion === "bolsa-asignar") return adminRegalosBolsaAsignar(env, c, quien);
   if (accion === "eliminar-datos") return adminRegalosEliminarDatos(env, c, quien);
   if (accion === "mensaje") return adminRegalosMensaje(env, c, quien);
   return json({ error: "no_encontrado" }, 404);
@@ -5297,6 +5488,19 @@ function paginaRegalosAdmin() {
   </section>
 
   <section class="panel" id="p-pedidos" hidden>
+    <div class="caja">
+      <h2>Bolsa común</h2>
+      <p class="mu">Aportes de quien tiene menos del valor de un regalo. No apartan a nadie: cuando la bolsa de una moneda
+      alcanza el valor de un regalo, lo financias aquí con el código del niño. El dinero se toma de los aportes más viejos
+      primero, y cada aportante recibe un correo con el niño al que llegó.</p>
+      <div id="bolsa-saldos" class="mu">Cargando…</div>
+      <div class="fila">
+        <label>Código del niño<input id="bolsa-codigo" placeholder="LET-0001" maxlength="8"></label>
+        <label>Moneda<select id="bolsa-moneda"><option value="COP">Pesos</option><option value="USD">Dólares</option><option value="EUR">Euros</option></select></label>
+        <button class="b" id="bolsa-asignar">Financiar desde la bolsa</button>
+      </div>
+      <span class="msg" id="m-bolsa" role="status"></span>
+    </div>
     <p class="mu">En pesos, el pago lo confirma Wompi. En dólares lo recibe la aliada: cuando ella reporte la donación
     (con el número de pedido en la nota), se confirma aquí y los regalos quedan financiados.</p>
     <span class="msg" id="m-pedidos" role="status"></span>
@@ -5372,8 +5576,9 @@ function paginaRegalosAdmin() {
     <div class="caja">
       <h2>Valor por tipo de regalo</h2>
       <p class="mu">Un tope fijo por tipo, no el precio de cada deseo. Un regalo no se publica mientras su tipo no tenga valor
-      en pesos y en dólares. Los dólares son números redondos, no una conversión de la TRM.</p>
-      <div class="tabla"><table><thead><tr><th>Tipo</th><th>Pesos</th><th>Dólares</th><th></th></tr></thead>
+      en pesos y en dólares. Los dólares y los euros son números redondos, no una conversión. Los euros solo los usa la
+      página en francés, con PayPal.</p>
+      <div class="tabla"><table><thead><tr><th>Tipo</th><th>Pesos</th><th>Dólares</th><th>Euros</th><th></th></tr></thead>
       <tbody id="tb-cats"></tbody></table></div>
       <span class="msg" id="m-ajustes" role="status"></span>
     </div>
@@ -5439,7 +5644,18 @@ function cargar(){
 }
 
 function pintar(){
-  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos(); pintarCartas(); pintarEmbajadores();
+  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos(); pintarCartas(); pintarEmbajadores(); pintarBolsa();
+}
+
+function pintarBolsa(){
+  var B = D.bolsa;
+  if (!B) { $("bolsa-saldos").textContent = "Falta aplicar la migración 0072."; return; }
+  var nom = { COP: "Pesos", USD: "Dólares", EUR: "Euros" };
+  var fmt = function(m, n){ return m === "EUR" ? n + " €" : m === "USD" ? usd(n) : cop(n); };
+  $("bolsa-saldos").innerHTML = ["COP", "USD", "EUR"].map(function(m){
+    var x = B.monedas[m];
+    return "<strong>" + nom[m] + ":</strong> saldo " + fmt(m, x.aportado - x.usado) + " · " + x.aportes + " aporte(s) por " + fmt(m, x.aportado);
+  }).join("<br>") + "<br>Regalos financiados desde la bolsa: " + B.regalos;
 }
 
 function pintarEmbajadores(){
@@ -5605,6 +5821,7 @@ function pintarCategorias(){
     return "<tr><td><strong>" + esc(k.nombre_es) + "</strong>" + (k.con_talla ? " <span class='mu'>(con talla)</span>" : "") + "</td>" +
       "<td><input type='number' min='0' step='1000' id='kc-" + esc(k.id) + "' value='" + esc(k.valor_cop == null ? "" : k.valor_cop) + "' placeholder='pesos'></td>" +
       "<td><input type='number' min='0' step='1' id='ku-" + esc(k.id) + "' value='" + esc(k.valor_usd == null ? "" : k.valor_usd) + "' placeholder='dólares'></td>" +
+      "<td><input type='number' min='0' step='1' id='ke-" + esc(k.id) + "' value='" + esc(k.valor_eur == null ? "" : k.valor_eur) + "' placeholder='euros'></td>" +
       "<td><button class='b' data-cat='" + esc(k.id) + "'>Guardar</button></td></tr>";
   }).join("");
 }
@@ -5817,7 +6034,8 @@ function pintarPedidos(){
     if (p.estado === "pendiente") acc += " <button class='b chico' data-anular='" + esc(p.ref) + "'>Anular</button>";
     return "<tr><td class='num'>" + esc(p.ref) + (p.guia ? "<br><span class='mu'>" + esc(p.guia) + "</span>" : "") + "</td>" +
       "<td>" + esc(p.nombre) + "<br><span class='mu'>" + esc(p.email) + "</span></td>" +
-      "<td>" + (p.via === "usd" ? usd(p.total_usd) : cop(p.total_cop)) + "<br><span class='mu'>" +
+      "<td>" + (p.moneda === "EUR" ? esc(p.total_eur) + " €" : p.via === "usd" ? usd(p.total_usd) : cop(p.total_cop)) + "<br><span class='mu'>" +
+        (p.bolsa ? "bolsa común · " : "") +
         (p.canal === "banco" ? "al banco · se confirma en la bandeja" : p.canal === "paypal" ? "PayPal" : p.via === "usd" ? "vía aliada" : "Wompi") + "</span></td>" +
       "<td>" + p.items + (p.sustituidos ? "<br><span class='mu'>" + p.sustituidos + " sustituido(s)</span>" : "") +
         (p.sin_cupo ? "<br><span class='avisos'>" + p.sin_cupo + " sin cupo</span>" : "") + "</td>" +
@@ -5870,8 +6088,19 @@ document.addEventListener("click", function(ev){
   if ((b = t.closest("[data-cat]"))) {
     var k = b.getAttribute("data-cat");
     enviar("/api/admin/regalos/categoria", { id: k, valor_cop: $("kc-" + k).value === "" ? null : Number($("kc-" + k).value),
-      valor_usd: $("ku-" + k).value === "" ? null : Number($("ku-" + k).value) })
+      valor_usd: $("ku-" + k).value === "" ? null : Number($("ku-" + k).value),
+      valor_eur: $("ke-" + k) && $("ke-" + k).value !== "" ? Number($("ke-" + k).value) : null })
       .then(function(){ aviso("m-ajustes", "Valor guardado."); return cargar(); }).catch(function(e){ aviso("m-ajustes", motivo(e), true); });
+    return;
+  }
+  if (t.id === "bolsa-asignar") {
+    var cod = $("bolsa-codigo").value.trim().toUpperCase(), mon = $("bolsa-moneda").value;
+    if (!cod) { aviso("m-bolsa", "Escribe el código del niño.", true); return; }
+    if (!confirm("Financiar " + cod + " con la bolsa en " + mon + ". Se avisa por correo a cada aportante cuyo dinero se use. ¿Seguir?")) return;
+    enviar("/api/admin/regalos/bolsa-asignar", { codigo: cod, moneda: mon }).then(function(d){
+      aviso("m-bolsa", d.codigo + " financiado desde la bolsa (" + d.usos.length + " aporte(s)).");
+      $("bolsa-codigo").value = ""; return cargar();
+    }).catch(function(e){ aviso("m-bolsa", motivo(e), true); });
     return;
   }
   if ((b = t.closest("[data-editar]"))) { formEditar(b.getAttribute("data-editar")); return; }
@@ -52126,7 +52355,7 @@ export default {
         }
         const rga = ruta.match(/^\/api\/admin\/regalos\/(foto|autorizacion)\/([A-Za-z]{3}-\d{4})$/);
         if (rga) return await adminRegaloArchivo(request, env, rga[2].toUpperCase(), rga[1], sesion.email);
-        const rgx = ruta.match(/^\/api\/admin\/regalos\/(campana|zona|categoria|nino|estado|mensaje|eliminar-datos|pedido-confirmar|pedido-anular)$/);
+        const rgx = ruta.match(/^\/api\/admin\/regalos\/(campana|zona|categoria|nino|estado|mensaje|eliminar-datos|pedido-confirmar|pedido-anular|bolsa-asignar)$/);
         if (rgx) return await adminRegalosAccion(request, env, rgx[1], sesion.email);
         /* El número va en la ruta con su forma exacta, igual que el aporte:
            cualquier otra cosa ni siquiera entra a la función. */
@@ -52637,7 +52866,7 @@ export default {
       const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
       /* `?lang=sv` (solo regalos) recibe la tarjeta en inglés: no hay una en sueco. */
       const qLang = url.searchParams.get("lang");
-      const pagina = paginaIndexable(base, rIdx[1], qLang === "en" || (qLang === "sv" && rIdx[1] === "regalos"));
+      const pagina = paginaIndexable(base, rIdx[1], qLang === "en" || ((qLang === "sv" || qLang === "fr") && rIdx[1] === "regalos"));
       /* /regalos?incrustado=1: la campaña dentro del sitio de la fundación
          aliada (Positive Potential, 12 nov 2026). Solo esta página, solo con
          ese parámetro y solo para los dominios de REGALOS_MARCOS se afloja el
