@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=f085ba86" defer></script>
+<script src="/app.js?v=ac677394" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1578,17 +1578,6 @@
     </div>
   </section>
 
-  <section class="cream" id="rg-como">
-    <div class="wrap">
-      <h2 class="h-comp3" data-i18n="rg.como.h">Cómo funciona</h2>
-      <div class="steps rg-pasos">
-        <div class="step"><div class="step-n">1</div><div><h3 class="h-comp4" data-i18n="rg.como.1.t">Escoge</h3><p data-i18n="rg.como.1.p">Filtra por zona, edad o tipo de regalo y agrega a tu lista los que quieras regalar.</p></div></div>
-        <div class="step"><div class="step-n">2</div><div><h3 class="h-comp4" data-i18n="rg.como.2.t">Paga</h3><p data-i18n="rg.como.2.p">En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.</p></div></div>
-        <div class="step"><div class="step-n">3</div><div><h3 class="h-comp4" data-i18n="rg.como.3.t">Síguelo</h3><p data-i18n="rg.como.3.p">Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.</p></div></div>
-      </div>
-    </div>
-  </section>
-
   <section id="rg-catalogo" hidden>
     <div class="wrap">
       <h2 class="h-sec" data-i18n="rg.lista.h">Escoge a quién regalar</h2>
@@ -1601,6 +1590,19 @@
       <div class="rg-grid" id="rg-grid"></div>
       <div class="rg-mas"><button type="button" class="btn btn-w" id="rg-mas" hidden data-act="rgMas()" data-i18n="rg.mas">Ver más</button></div>
       <p class="rg-priv mu" data-i18n="rg.privnota">Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.</p>
+    </div>
+  </section>
+
+  <!-- «Cómo funciona» va DESPUÉS de los niños (27 nov 2026, pedido de Sebas):
+       primero se ve a quién regalar, y la explicación queda para quien la busca. -->
+  <section class="cream" id="rg-como">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="rg.como.h">Cómo funciona</h2>
+      <div class="steps rg-pasos">
+        <div class="step"><div class="step-n">1</div><div><h3 class="h-comp4" data-i18n="rg.como.1.t">Escoge</h3><p data-i18n="rg.como.1.p">Filtra por zona, edad o tipo de regalo y agrega a tu lista los que quieras regalar.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 class="h-comp4" data-i18n="rg.como.2.t">Paga</h3><p data-i18n="rg.como.2.p">En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 class="h-comp4" data-i18n="rg.como.3.t">Síguelo</h3><p data-i18n="rg.como.3.p">Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.</p></div></div>
+      </div>
     </div>
   </section>
 
