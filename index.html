@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=f40f9cb0">
+<link rel="stylesheet" href="/styles.css?v=c269ce04">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=245440fb" defer></script>
+<script src="/app.js?v=43aee877" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1543,6 +1543,29 @@
       <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
       <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>
       <p class="rg-plazo" id="rg-plazo" aria-live="polite" hidden></p>
+      <!-- EL REGALO RÁPIDO (27 nov 2026, pedido de Sebas): para quien no se maneja
+           con la tecnología. Un botón, tres pasos y directo al pago: la página
+           escoge a quienes llevan más tiempo esperando. -->
+      <div class="rg-rapido-cta" id="rg-rapido-cta" hidden>
+        <button type="button" class="btn btn-g rg-rapido-btn" data-act="rgRapido(true)" data-i18n="rg.rapido.btn">Regalar ahora, en un minuto</button>
+        <p class="mu" data-i18n="rg.rapido.sub">Sin escoger ni llenar formularios largos: escogemos por ti a quien lleva más tiempo esperando.</p>
+      </div>
+      <div class="rg-rapido" id="rg-rapido" hidden>
+        <h2 class="h-comp3" data-i18n="rg.rapido.h">Tu regalo en tres pasos</h2>
+        <p class="rg-rapido-paso" data-i18n="rg.rapido.p1">1. ¿A cuántos niños quieres regalar?</p>
+        <div class="rg-rapido-n" id="rg-rapido-n" role="group"></div>
+        <div class="rg-rapido-quien" id="rg-rapido-quien" aria-live="polite"></div>
+        <p class="rg-rapido-paso" data-i18n="rg.rapido.p2">2. Tus datos, para enviarte el recibo y contarte cuando llegue</p>
+        <div class="field"><label for="rg-r-nombre" data-i18n="rg.f.nombre">Tu nombre</label><input id="rg-r-nombre" autocomplete="name" maxlength="120"></div>
+        <div class="field"><label for="rg-r-email" data-i18n="rg.f.email">Tu correo</label><input id="rg-r-email" type="email" autocomplete="email" maxlength="160"></div>
+        <label class="ally-check"><input type="checkbox" id="rg-r-priv"> <span><span data-i18n="rg.f.priv">Acepto que Give&amp;Grow use mis datos para este pedido, según la</span> <a href="#privacidad" data-i18n="rg.f.priv.link">Política de Privacidad</a></span></label>
+        <p class="rg-rapido-paso" data-i18n="rg.rapido.p3">3. Paga</p>
+        <button type="button" class="btn btn-g rg-rapido-pagar" id="rg-r-pagar" data-act="rgRapidoPagar()">Pagar</button>
+        <p class="mu rg-rapido-como" id="rg-r-como"></p>
+        <p class="rg-msg" id="rg-r-msg" role="status" aria-live="polite"></p>
+        <p class="mu rg-rapido-nota" data-i18n="rg.rapido.carta">Después podrás escribirles una carta desde el enlace que te llega al correo.</p>
+        <p class="rg-rapido-otras"><button type="button" class="rg-quitar" data-act="rgRapidoOtras()" data-i18n="rg.rapido.otras">Prefiero escoger yo o pagar de otra forma</button></p>
+      </div>
       <h2 class="rg-luces-t rv d2" data-i18n="rg.luces.t">Una luz por cada niño</h2>
       <p class="rg-luces-p rv d2" data-i18n="rg.luces.p">Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.</p>
       <div class="rg-zonas rv d2" id="rg-zonas" aria-live="polite"></div>
