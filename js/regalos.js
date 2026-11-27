@@ -473,8 +473,11 @@ function rgEspera(){
   cand.sort(function(a, b){
     var da = a.desde || "9999", db = b.desde || "9999";
     if (da !== db) return da < db ? -1 : 1;
-    if (a.edad !== b.edad) return b.edad - a.edad;
-    return a.codigo < b.codigo ? -1 : 1;
+    /* AL AZAR ENTRE EMPATADOS (27 nov 2026, decisión de Sebas). Casi todos los
+       niños se publican el mismo día, y desempatar por edad hacía que siempre
+       salieran primero los de 17 años. El azar es el de la visita (`rgAzar`):
+       estable mientras la persona está en la página. */
+    return rgAzar(a.codigo) - rgAzar(b.codigo);
   });
   var r = cand[0];
   RG.foco = r.codigo;
@@ -969,8 +972,11 @@ function rgRapidoElegir(n){
   cand.sort(function(a, b){
     var da = a.desde || "9999", db = b.desde || "9999";
     if (da !== db) return da < db ? -1 : 1;
-    if (a.edad !== b.edad) return b.edad - a.edad;
-    return a.codigo < b.codigo ? -1 : 1;
+    /* AL AZAR ENTRE EMPATADOS (27 nov 2026, decisión de Sebas). Casi todos los
+       niños se publican el mismo día, y desempatar por edad hacía que siempre
+       salieran primero los de 17 años. El azar es el de la visita (`rgAzar`):
+       estable mientras la persona está en la página. */
+    return rgAzar(a.codigo) - rgAzar(b.codigo);
   });
   return cand.slice(0, n);
 }
