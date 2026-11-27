@@ -3439,9 +3439,16 @@ function avisoIdioma(mostrar){
   f.style.top = (nav ? nav.getBoundingClientRect().height : 0) + "px";
   f.style.display = mostrar ? "block" : "none";
 }
+/* GANA EL ÚLTIMO IDIOMA PEDIDO (27 nov 2026). Cada idioma llega cuando llega
+   su diccionario: el español es inmediato y el francés o el sueco piden dos
+   archivos. Pulsando dos idiomas seguidos, o con un `?lang=` que tarda, el que
+   terminaba de cargar último se aplicaba encima del que la persona eligió. */
+var LANG_PEDIDO = null;
 function setLang(l){
   var next = idiomaPosible(l);
+  LANG_PEDIDO = next;
   ensureLang(next).then(function(){
+    if (LANG_PEDIDO !== next) return;
     if (next !== "es" && !I18N[next]){ avisoIdioma(true); return; }
     avisoIdioma(false);
     var vt = document.startViewTransition && window.matchMedia &&
