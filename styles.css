@@ -2593,6 +2593,26 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
    junto a lo que se teclea en el banco (concepto, cuenta, SWIFT). */
 .rg-banco{margin:6px 0 10px;max-width:640px}
 .rg-banco dd{display:flex;flex-wrap:wrap;align-items:center;gap:10px;overflow-wrap:anywhere}
+/* EL REGALO RÁPIDO (27 nov 2026): un botón grande en la portada y un panel de
+   tres pasos con letra amplia y botones grandes, para quien no se maneja con
+   la tecnología. Mismos filos plata que el resto de la página. */
+.rg-rapido-cta{margin:22px 0 6px}
+.rg-rapido-btn{font-size:var(--fs-18,1.125rem);padding:16px 28px;min-height:56px}
+.rg-rapido-cta p{margin:10px 0 0;max-width:56ch}
+.rg-rapido{margin:26px 0 8px;padding:26px 26px 18px;border:1px solid var(--plata);border-radius:18px;background:var(--surface);max-width:640px}
+.rg-rapido .h-comp3{margin:0 0 6px}
+.rg-rapido-paso{font-weight:700;font-size:var(--fs-17,1.06rem);margin:22px 0 10px;color:var(--ink)}
+.rg-rapido-n{display:flex;flex-wrap:wrap;gap:10px}
+.rg-rapido-n .map-fchip{min-height:48px;padding:0 20px;font-size:var(--fs-16)}
+.rg-rapido-quien{margin-top:14px}
+.rg-rapido-lista{margin:8px 0 0;padding-left:20px;line-height:1.6}
+.rg-rapido-total{margin:10px 0 0;font-size:var(--fs-17,1.06rem)}
+.rg-rapido .field{margin-top:12px}
+.rg-rapido-pagar{width:100%;min-height:56px;font-size:var(--fs-18,1.125rem)}
+.rg-rapido-como{margin:10px 0 0}
+.rg-rapido-nota{margin:12px 0 0}
+.rg-rapido-otras{margin:8px 0 0}
+
 /* LA BOLSA COMÚN (27 nov 2026): una invitación quieta bajo el catálogo y la
    caja del monto en lugar de la lista. Mismos filos plata que las tarjetas. */
 .rg-bolsa-cta{margin:34px 0 8px;padding:24px 26px;border:1px solid var(--plata);border-radius:16px;background:var(--surface);max-width:720px}

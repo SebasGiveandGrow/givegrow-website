@@ -2665,6 +2665,23 @@ var I18N = {
     "rg.via.l":"¿Cómo quieres pagar?",
     "rg.via.cop":"En pesos colombianos, con Wompi",
     "rg.via.usd":"En dólares, a través de nuestra fundación aliada en Estados Unidos",
+    "rg.rapido.btn":"Regalar ahora, en un minuto",
+    "rg.rapido.sub":"Sin escoger ni llenar formularios largos: escogemos por ti a quien lleva más tiempo esperando.",
+    "rg.rapido.h":"Tu regalo en tres pasos",
+    "rg.rapido.p1":"1. ¿A cuántos niños quieres regalar?",
+    "rg.rapido.p2":"2. Tus datos, para enviarte el recibo y contarte cuando llegue",
+    "rg.rapido.p3":"3. Paga",
+    "rg.rapido.n1":"1 niño",
+    "rg.rapido.nn":"{n} niños",
+    "rg.rapido.quien":"Le regalarás a quienes llevan más tiempo esperando:",
+    "rg.rapido.pocos":"Por ahora solo quedan {n} esperando.",
+    "rg.rapido.pagar":"Pagar {total}",
+    "rg.rapido.como.cop":"Pagas con tarjeta o con el Botón Bancolombia, en Wompi, la pasarela segura de Bancolombia.",
+    "rg.rapido.como.paypal":"Pagas en PayPal, con tu cuenta o con tarjeta.",
+    "rg.rapido.como.usd":"Pagas en dólares a través de {a}, nuestra fundación aliada en Estados Unidos.",
+    "rg.rapido.carta":"Después podrás escribirles una carta desde el enlace que te llega al correo.",
+    "rg.rapido.otras":"Prefiero escoger yo o pagar de otra forma",
+    "rg.rapido.cambio":"Alguien acaba de escoger a uno de ellos. Te propusimos a otro niño: revisa y vuelve a pagar.",
     "rg.bolsa.t":"¿No te alcanza para un regalo completo?",
     "rg.bolsa.p":"Aporta lo que puedas a la bolsa común. Cuando la bolsa alcanza el valor de un regalo, lo asignamos a un niño que sigue esperando y te contamos a quién llegó tu aporte.",
     "rg.bolsa.btn":"Aportar a la bolsa común",
@@ -3920,7 +3937,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "3b5d2f68", impacto: "59c96b4d", regalos: "2c59afec", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "3b5d2f68", impacto: "59c96b4d", regalos: "e6e8e998", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -4064,7 +4081,7 @@ var ACT_DIFERIDAS = {
   closeLightbox:"impacto", lbStep:"impacto",
   rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
   rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
-  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos", rgBolsa:"regalos", rgCopiar:"regalos", rgComprobante:"regalos",
+  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos", rgRapido:"regalos", rgRapidoN:"regalos", rgRapidoPagar:"regalos", rgRapidoOtras:"regalos", rgBolsa:"regalos", rgCopiar:"regalos", rgComprobante:"regalos",
   apuCalcula:"apadrinamiento", apuInteres:"apadrinamiento"
 };
 function runAct(spec, el, ev){

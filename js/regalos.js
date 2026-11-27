@@ -157,6 +157,7 @@ function rgPinta(){
   rgEl("rg-pronto").hidden = estado !== "borrador";
   rgEl("rg-terminada").hidden = estado !== "cerrada";
   rgEl("rg-catalogo").hidden = !abierta;
+  rgEl("rg-rapido-cta").hidden = !(abierta && c.recibe) || !!RG.rapido;
   rgEl("rg-comp-camp").hidden = !(abierta && c.recibe);
   rgEl("rg-espera").hidden = !(abierta && c.recibe);
   if (!abierta) { rgEl("rg-pagar").hidden = true; rgEl("rg-barra").hidden = true; return; }
@@ -559,6 +560,7 @@ function rgPintaLista(){
   var nota = rgEl("rg-cert-usd");
   nota.hidden = RG.via !== "usd";
   nota.textContent = c.aliada_nombre ? t("rg.cert.usd").replace("{a}", c.aliada_nombre) : "";
+  if (RG.rapido) rgRapidoPinta();
 }
 
 function rgVia(v){
@@ -940,4 +942,135 @@ function rgSegGuardar(ev){
     .then(function(){ RG.enviando = false; RG.video = null; RG.segIntentos = 99; rgSeguimiento(s.ref, s.tk); },
           function(){ RG.enviando = false; allyMsg(note, t("rg.e.red"), false); });
   return false;
+}
+
+
+/* ---------- EL REGALO RÁPIDO (27 nov 2026, pedido de Sebas) ----------
+   Para quien quiere regalar sin entender de tecnología: cuántos niños, nombre y
+   correo, y a pagar. La página escoge con la misma regla del botón «escoge por
+   mí»: quien lleva más tiempo esperando. Sin certificado, carta ni video aquí
+   —la carta se puede escribir después desde el seguimiento—; quien los quiera,
+   tiene el formulario completo a un clic. La forma de pago es la más simple de
+   cada idioma: Wompi en español, PayPal en inglés y sueco (dólares) y en
+   francés (euros). */
+var RG_RAPIDO_N = [1, 2, 3, 5];
+function rgRapidoVia(){
+  var c = (RG.datos && RG.datos.campana) || {};
+  if (lang === "es") return "cop";
+  if (c.paypal) return "paypal";
+  return c.usd ? "usd" : "cop";
+}
+function rgRapidoMoneda(via){ return via === "paypal" ? (lang === "fr" ? "EUR" : "USD") : via === "usd" ? "USD" : "COP"; }
+function rgRapidoElegir(n){
+  var mon = rgRapidoMoneda(rgRapidoVia());
+  var cand = (RG.datos && RG.datos.regalos || []).filter(function(r){
+    return r.estado === "disponible" && RG.lista.indexOf(r.codigo) < 0 && rgValorDe(r, mon) != null;
+  });
+  cand.sort(function(a, b){
+    var da = a.desde || "9999", db = b.desde || "9999";
+    if (da !== db) return da < db ? -1 : 1;
+    if (a.edad !== b.edad) return b.edad - a.edad;
+    return a.codigo < b.codigo ? -1 : 1;
+  });
+  return cand.slice(0, n);
+}
+function rgRapido(abrir){
+  RG.rapido = abrir ? (RG.rapido || { n: 1 }) : null;
+  rgEl("rg-rapido").hidden = !abrir;
+  rgEl("rg-rapido-cta").hidden = !!abrir;
+  if (!abrir) return;
+  rgRapidoPinta();
+  rgEl("rg-rapido").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function rgRapidoN(n){ if (!RG.rapido) return; RG.rapido.n = Number(n) || 1; rgRapidoPinta(); }
+function rgRapidoPinta(){
+  if (!RG.rapido) return;
+  var via = rgRapidoVia(), mon = rgRapidoMoneda(via), c = (RG.datos && RG.datos.campana) || {};
+  rgEl("rg-rapido-n").innerHTML = RG_RAPIDO_N.map(function(n){
+    var on = RG.rapido.n === n;
+    return '<button type="button" class="map-fchip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-act="rgRapidoN(' + n + ')">' +
+      rgEsc(t(n === 1 ? "rg.rapido.n1" : "rg.rapido.nn").replace("{n}", n)) + '</button>';
+  }).join("");
+  var sel = rgRapidoElegir(RG.rapido.n);
+  RG.rapido.sel = sel.map(function(r){ return r.codigo; });
+  var total = 0; sel.forEach(function(r){ total += Number(rgValorDe(r, mon)) || 0; });
+  RG.rapido.total = total;
+  var quien = rgEl("rg-rapido-quien");
+  if (!sel.length) {
+    quien.innerHTML = '<p class="mu">' + rgEsc(t("rg.espera.nadie")) + '</p>';
+  } else {
+    quien.innerHTML = '<p class="mu">' + rgEsc(t("rg.rapido.quien")) + '</p><ul class="rg-rapido-lista">' + sel.map(function(r){
+      return '<li><strong>' + rgEsc(r.nombre) + '</strong>, ' + rgEsc(rgEdad(r.edad)) + ' · ' + rgEsc(rgDeseo(r)) +
+        ' <span class="mu">· ' + rgEsc(rgZona(r.zona)) + '</span></li>';
+    }).join("") + '</ul>' +
+    (sel.length < RG.rapido.n ? '<p class="mu">' + rgEsc(t("rg.rapido.pocos").replace("{n}", sel.length)) + '</p>' : '') +
+    '<p class="rg-rapido-total">' + rgEsc(t("rg.total")) + ' <strong>' + rgEsc(rgFmt(mon, total)) + '</strong></p>';
+  }
+  var btn = rgEl("rg-r-pagar");
+  btn.textContent = t("rg.rapido.pagar").replace("{total}", rgFmt(mon, total));
+  btn.disabled = !sel.length || !!RG.enviando;
+  rgEl("rg-r-como").textContent = via === "usd"
+    ? t("rg.rapido.como.usd").replace("{a}", c.aliada_nombre || "") : t("rg.rapido.como." + via);
+}
+/* A dónde ir con el pedido ya creado: lo mismo que hace el formulario completo. */
+function rgRapidoIr(d){
+  if (d.canal === "paypal") {
+    if (RG.incrustado) { try { window.top.location.href = d.url; return; } catch (e) {} rgPintaPagoNuevaPestana(d); return; }
+    window.location.href = d.url; return;
+  }
+  if (d.via === "cop") {
+    try { sessionStorage.setItem("gg_guia", d.guia); } catch (e) {}
+    if (RG.incrustado) { rgPintaPagoNuevaPestana(d); return; }
+    window.location.href = d.url; return;
+  }
+  if (rgPagoEnCasa(d.url)) { try { window.top.location.href = d.url; } catch (e) {} }
+  rgPintaUsd(d);
+}
+function rgRapidoPagar(){
+  if (RG.enviando || !RG.rapido) return;
+  var note = rgEl("rg-r-msg");
+  var nombre = rgEl("rg-r-nombre").value.trim(), email = rgEl("rg-r-email").value.trim();
+  if (!RG.rapido.sel || !RG.rapido.sel.length) { allyMsg(note, t("rg.espera.nadie"), false); return; }
+  if (nombre.length < 2) { allyMal(note, "rg-r-nombre", "rg.e.nombre"); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { allyMal(note, "rg-r-email", "rg.e.email"); return; }
+  if (!rgEl("rg-r-priv").checked) { allyMal(note, "rg-r-priv", "rg.e.priv"); return; }
+  var via = rgRapidoVia(), mon = rgRapidoMoneda(via);
+  var cuerpo = {
+    items: RG.rapido.sel.slice(), via: via, nombre: nombre, email: email, muro: "no",
+    moneda: mon === "EUR" ? "EUR" : undefined, pagina: lang, idioma: rgIngles() ? "en" : "es",
+    embajador: (function(){ try { return sessionStorage.getItem("rg-emb") || ""; } catch (e) { return ""; } })()
+  };
+  var btn = rgEl("rg-r-pagar");
+  RG.enviando = true; btn.disabled = true;
+  allyMsg(note, t("rg.enviando"), true);
+  fetch("/api/regalos/pedido", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(function(r){ return r.json().then(function(j){ if (!r.ok) { var e = new Error(j.error || "http_" + r.status); e.datos = j; throw e; } return j; }); })
+    .then(function(d){ RG.enviando = false; btn.disabled = false; rgRapidoIr(d); })
+    .catch(function(e){
+      RG.enviando = false; btn.disabled = false;
+      var c = e && e.message, j = e && e.datos;
+      /* Otro donante tomó a alguno en ese instante: se proponen otros y se avisa. */
+      if (c === "no_disponibles" && j && j.codigos) {
+        (RG.datos.regalos || []).forEach(function(r){ if (j.codigos.indexOf(r.codigo) >= 0) r.estado = "apartado"; });
+        rgRapidoPinta(); rgPintaGrid();
+        allyMsg(note, t("rg.rapido.cambio"), false);
+        return;
+      }
+      var clave = { campana_cerrada: "rg.e.cerrada", demasiados_intentos: "rg.e.intentos", correo_invalido: "rg.e.email",
+        pasarela_no_configurada: "rg.e.pasarela", paypal_fallo: "rg.e.paypal", paypal_no_configurado: "rg.e.paypal" }[c] || "rg.e.red";
+      allyMsg(note, t(clave), false);
+    });
+}
+/* Para quien prefiere escoger o pagar de otra forma: los niños propuestos pasan
+   a su lista y va al formulario completo. */
+function rgRapidoOtras(){
+  var sel = RG.rapido && RG.rapido.sel || [];
+  sel.forEach(function(k){ if (RG.lista.indexOf(k) < 0) RG.lista.push(k); });
+  rgGuardaLista();
+  var n = rgEl("rg-r-nombre").value.trim(), e = rgEl("rg-r-email").value.trim();
+  if (n && !rgEl("rg-nombre").value) rgEl("rg-nombre").value = n;
+  if (e && !rgEl("rg-email").value) rgEl("rg-email").value = e;
+  rgRapido(false);
+  rgPintaGrid(); rgPintaLista();
+  if (sel.length) rgIrAPagar(); else rgEl("rg-catalogo").scrollIntoView({ behavior: "smooth", block: "start" });
 }
