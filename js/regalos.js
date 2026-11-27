@@ -8,11 +8,22 @@
    página, no a cerrar la pestaña, y no sale del navegador hasta que se paga.
    Que un regalo siga libre lo decide el servidor al apartarlo, no esta lista. */
 var RG = {
-  datos: null, pidiendo: null, ver: 24, via: "cop", enviando: false,
+  datos: null, pidiendo: null, paginas: 1, via: "cop", enviando: false,
   f: { zona: "", tipo: "", edad: "", genero: "", disp: "1" },
   lista: []
 };
-var RG_PAGINA = 24;
+/* TRES FILAS Y «VER MÁS» (27 nov 2026, pedido de Sebas). Antes se mostraban 24
+   tarjetas de una vez; ahora caben exactamente tres filas, sean cuantas sean
+   las columnas en esa pantalla, y cada «Ver más» suma tres filas. Las columnas
+   se leen de la grilla ya pintada (auto-fill), no se adivinan. */
+var RG_FILAS = 3;
+function rgColumnas(){
+  var g = rgEl("rg-grid");
+  var v = g ? getComputedStyle(g).gridTemplateColumns : "none";
+  var n = v && v !== "none" ? v.split(" ").filter(Boolean).length : 0;
+  return n > 0 ? n : 4;
+}
+function rgVer(){ return rgColumnas() * RG_FILAS * RG.paginas; }
 /* El moño del regalo envuelto (las tarjetas sin foto). */
 var RG_MONO = '<span class="rg-mono" aria-hidden="true"><svg viewBox="0 0 48 30">' +
   '<path class="rg-cola" d="M20 15l-7 12M28 15l7 12"/>' +
@@ -311,12 +322,20 @@ function rgChip(campo, valor, texto){
 function rgPintaFiltros(){
   var d = RG.datos;
   var g = function(etq, chips){ return '<div class="rg-fgrupo" role="group" aria-label="' + rgEsc(etq) + '"><span class="rg-fetq">' + rgEsc(etq) + '</span>' + chips + '</div>'; };
-  var zonas = rgChip("zona", "", t("rg.todas")) + (d.zonas || []).map(function(z){ return rgChip("zona", z.id, rgIngles() ? z.nombre_en : z.nombre_es); }).join("");
+  /* SOLO LAS ZONAS QUE YA TIENEN NIÑOS (27 nov 2026, pedido de Sebas): un filtro
+     de Medellín o Uribia sin una sola tarjeta llevaba a una lista vacía. Cuando
+     se carguen sus niños, el filtro aparece solo. Con una sola zona, el grupo
+     entero sobra. */
+  var conNinos = (d.zonas || []).filter(function(z){ return (d.regalos || []).some(function(r){ return r.zona === z.id; }); });
+  if (RG.f.zona && !conNinos.some(function(z){ return z.id === RG.f.zona; })) RG.f.zona = "";
+  var zonas = conNinos.length > 1
+    ? rgChip("zona", "", t("rg.todas")) + conNinos.map(function(z){ return rgChip("zona", z.id, rgIngles() ? z.nombre_en : z.nombre_es); }).join("")
+    : "";
   var tipos = rgChip("tipo", "", t("rg.todos")) + (d.categorias || []).map(function(k){ return rgChip("tipo", k.id, rgNombreTipo(k)); }).join("");
   var edades = rgChip("edad", "", t("rg.todas")) + Object.keys(RG_EDADES).map(function(k){ return rgChip("edad", k, t("rg.edad.r").replace("{r}", k.replace("-", lang === "sv" ? " till " : lang === "fr" ? " à " : lang === "en" ? " to " : " a "))); }).join("");
   var generos = rgChip("genero", "", t("rg.todos")) + rgChip("genero", "nina", t("rg.genero.nina")) + rgChip("genero", "nino", t("rg.genero.nino"));
   var disp = rgChip("disp", "1", t("rg.f.disp")) + rgChip("disp", "", t("rg.f.todos"));
-  rgEl("rg-filtros").innerHTML = g(t("rg.f.zona"), zonas) + g(t("rg.f.tipo"), tipos) + g(t("rg.f.edad"), edades) +
+  rgEl("rg-filtros").innerHTML = (zonas ? g(t("rg.f.zona"), zonas) : "") + g(t("rg.f.tipo"), tipos) + g(t("rg.f.edad"), edades) +
     g(t("rg.f.genero"), generos) + g(t("rg.f.estado"), disp);
 }
 
@@ -358,9 +377,19 @@ function rgPintaGrid(){
   if (total && !lista.length) {
     grid.innerHTML = '<p class="rg-vacio mu">' + rgEsc(t("rg.ninguno")) + '</p>';
   } else {
-    grid.innerHTML = lista.slice(0, RG.ver).map(function(r){ return rgTarjeta(r, recibe); }).join("");
+    grid.innerHTML = lista.slice(0, rgVer()).map(function(r){ return rgTarjeta(r, recibe); }).join("");
   }
-  rgEl("rg-mas").hidden = lista.length <= RG.ver;
+  rgEl("rg-mas").hidden = lista.length <= rgVer();
+  /* Si al girar el celular o cambiar el ancho cambian las columnas, se vuelve a
+     cortar en filas completas. */
+  if (!RG.oyeAncho) {
+    RG.oyeAncho = true;
+    var cols = rgColumnas(), t0 = 0;
+    window.addEventListener("resize", function(){
+      clearTimeout(t0);
+      t0 = setTimeout(function(){ var c = rgColumnas(); if (c !== cols && currentRoute === "regalos") { cols = c; rgPintaGrid(); } }, 200);
+    });
+  }
 }
 
 function rgTarjeta(r, recibe){
@@ -458,11 +487,11 @@ function rgEspera(){
 function rgFiltro(campo, valor){
   if (!RG.f.hasOwnProperty(campo)) return;
   RG.f[campo] = valor == null ? "" : String(valor);
-  RG.ver = RG_PAGINA;
+  RG.paginas = 1;
   rgPintaFiltros();
   rgPintaGrid();
 }
-function rgMas(){ RG.ver += RG_PAGINA; rgPintaGrid(); }
+function rgMas(){ RG.paginas += 1; rgPintaGrid(); }
 
 function rgToggle(codigo){
   var i = RG.lista.indexOf(codigo);
