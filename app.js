@@ -3444,6 +3444,14 @@ function avisoIdioma(mostrar){
    archivos. Pulsando dos idiomas seguidos, o con un `?lang=` que tarda, el que
    terminaba de cargar último se aplicaba encima del que la persona eligió. */
 var LANG_PEDIDO = null;
+/* EL PRIMER IDIOMA SE APLICA SIN ANIMACIÓN (27 nov 2026). Con `?lang=fr` (o
+   `en`, `sv`) la página arrancaba en español y nunca cambiaba: el cambio iba
+   dentro de `startViewTransition`, y Chrome aplaza ese callback hasta poder
+   pintar —una pestaña que se abre en segundo plano, o que aún no pinta, se
+   queda esperando—. Medido en producción: el francés pedido, los dos
+   diccionarios cargados y `postLang` sin correr. Al arrancar no hay nada que
+   animar; y si un cambio animado no arranca en 400 ms, se aplica igual. */
+var LANG_APLICADO = false;
 function setLang(l){
   var next = idiomaPosible(l);
   LANG_PEDIDO = next;
@@ -3453,10 +3461,14 @@ function setLang(l){
     avisoIdioma(false);
     var vt = document.startViewTransition && window.matchMedia &&
              !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
-             typeof lang !== "undefined" && lang && lang !== next;
+             typeof lang !== "undefined" && lang && lang !== next && LANG_APLICADO;
+    LANG_APLICADO = true;
     if (vt){
       try {
-        var tr = document.startViewTransition(function(){ postLang(next); });
+        var aplicado = false;
+        var aplicar = function(){ if (aplicado || LANG_PEDIDO !== next) return; aplicado = true; postLang(next); };
+        var tr = document.startViewTransition(aplicar);
+        setTimeout(aplicar, 400);
         // Si una transición previa sigue activa, esta la aborta y su promesa
         // rechaza con InvalidStateError: lo absorbemos (no es un fallo real).
         if (tr && tr.finished && tr.finished.catch) tr.finished.catch(function(){});
